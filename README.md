@@ -4,8 +4,9 @@ A semi-automated job application system for **Canadian AI, tech and Python roles
 roles, tailor a resume to each one, assist-fill the application form, and track every
 outcome — with email triage feeding status back in automatically.
 
-**Current state:** design phase. No code yet. Start with [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
-then [`docs/ROADMAP.md`](docs/ROADMAP.md) for the build order.
+**Setting it up?** Follow [`docs/SETUP.md`](docs/SETUP.md) — one ordered pass, start to finish.
+For why it is built this way, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); for what was
+built when, [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## The one-line version
 

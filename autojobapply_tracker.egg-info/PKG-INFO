@@ -1,0 +1,22 @@
+Metadata-Version: 2.4
+Name: autojobapply-tracker
+Version: 0.1.0
+Summary: Semi-automated job application system for Canadian AI/tech/Python roles
+Requires-Python: >=3.11
+Requires-Dist: pydantic>=2.0
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: typst>=0.11
+Requires-Dist: python-docx>=1.1
+Requires-Dist: pdfminer.six>=20231228
+Requires-Dist: fastapi>=0.110
+Requires-Dist: uvicorn[standard]>=0.27
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: keyring>=24.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Provides-Extra: llm
+Requires-Dist: anthropic>=0.40; extra == "llm"
+Provides-Extra: gmail
+Requires-Dist: google-api-python-client>=2.100; extra == "gmail"
+Requires-Dist: google-auth-oauthlib>=1.2; extra == "gmail"
+Requires-Dist: google-auth-httplib2>=0.2; extra == "gmail"

@@ -26,5 +26,17 @@ gmail = [
     "google-auth-httplib2>=0.2",
 ]
 
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Listed explicitly. Auto-discovery fails on a flat layout with several
+# packages, and would otherwise try to ship the runtime `data/` directory.
+[tool.setuptools]
+packages = ["api", "discover", "inbox", "resume", "sheets", "tailor"]
+
+[tool.setuptools.package-data]
+resume = ["templates/*.typ"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
