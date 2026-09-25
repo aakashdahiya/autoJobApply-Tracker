@@ -14,6 +14,33 @@ verified fact bank → the extension fills the application form and you press su
 Gmail triage watches for replies and moves the application through its states → you get one
 digest a day and an instant ping for anything time-sensitive.
 
+## Phase 0 is built: the resume pipeline
+
+```bash
+python -m venv .venv && .venv/bin/pip install -e ".[dev]"
+
+cp profile.example.yaml profile.yaml      # then replace every value with your own
+
+# How deep is the fact bank for each role shape?
+.venv/bin/python -m resume.render --profile profile.yaml --depth-only
+
+# Render one shape, ATS-safe, PDF + DOCX
+.venv/bin/python -m resume.render --profile profile.yaml \
+    --shape ml_platform --out out/resume.pdf --docx out/resume.docx
+
+.venv/bin/python -m pytest
+```
+
+Shapes are `research`, `ml_platform`, and `product_python`. All three live in the fact bank;
+each rendered resume targets exactly one.
+
+The command exits non-zero and writes nothing usable if any bullet fails to trace back to a
+fact, if a number appears that its source fact does not contain, if a skill reaches the page
+unsupported by a selected bullet, or if the text extracted back out of the finished PDF does
+not match what was rendered. That last check is not theoretical: it caught a layout where
+right-aligned employment dates were extracted *in the middle of the first bullet*, which looks
+perfect on screen and reads as mangled prose to an ATS.
+
 ## Design principles
 
 1. **Human presses submit.** The system does everything up to the submit button. This is

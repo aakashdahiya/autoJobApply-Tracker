@@ -1,0 +1,278 @@
+# EXAMPLE fact bank — every value here is placeholder. Copy to profile.yaml and
+# replace with your own history. profile.yaml is gitignored because it holds
+# personal data.
+#
+# The rule this file exists to enforce: nothing reaches a rendered resume that
+# is not a `fact` below. Tailoring reorders and re-weights these; it never adds.
+# Tag each fact with the role shapes it genuinely supports — one shape is
+# chosen per application, so breadth here costs nothing.
+
+identity:
+  name: Your Name
+  email: you@example.com
+  phone: "+1 647 555 0123"
+  city: Toronto
+  province: ON
+  links:
+    linkedin: linkedin.com/in/yourname
+    github: github.com/yourname
+
+constraints:
+  work_auth: work_permit
+  permit_type: open          # PGWP is an open permit; derives the sponsorship answer
+  permit_subtype: pgwp
+  work_auth_expiry: 2027-12-31
+  citizenship: India
+  credential_assessment: null   # WES ECA reference, if you hold one
+  provinces: [canada-wide]
+  work_modes: [remote, hybrid, onsite]
+  relocate_within_canada: true
+  expected_base_cad:
+    min: 120000
+    target: 145000
+  notice_period_days: 30
+  french_level: none
+
+self_id:                     # voluntary; quoted for clarity (the loader keeps them strings)
+  mode: disclose
+  gender: man
+  indigenous: "no"
+  racialized: "yes"
+  racialized_group: south_asian
+  disability: "no"
+  veteran: "no"
+
+skills:
+  Languages: [python, sql, go, typescript]
+  Machine learning: [pytorch, scikit-learn, mlflow, transformers, model-evaluation]
+  Data and infrastructure:
+    [postgresql, redis, kafka, airflow, spark, docker, kubernetes, terraform, aws]
+  Practices: [ci-cd, observability, ab-testing]
+
+# How skills are printed. Stored canonically and lowercased so keyword matching
+# against a job description stays reliable; only the label reaches the page.
+skill_labels:
+  python: Python
+  sql: SQL
+  go: Go
+  typescript: TypeScript
+  pytorch: PyTorch
+  scikit-learn: scikit-learn
+  mlflow: MLflow
+  transformers: Transformers
+  model-evaluation: model evaluation
+  postgresql: PostgreSQL
+  redis: Redis
+  kafka: Kafka
+  airflow: Airflow
+  spark: Spark
+  docker: Docker
+  kubernetes: Kubernetes
+  terraform: Terraform
+  aws: AWS
+  ci-cd: CI/CD
+  observability: observability
+  ab-testing: A/B testing
+
+experience:
+  - id: r_ml
+    title: ML Platform Engineer
+    company: Northwind Analytics
+    location: Toronto, ON
+    start: 2024-01
+  - id: r_backend
+    title: Senior Backend Engineer
+    company: Meridian Software
+    location: Pune, India
+    start: 2021-01
+    end: 2022-07
+  - id: r_data
+    title: Data Engineer
+    company: Kestrel Labs
+    location: Pune, India
+    start: 2018-07
+    end: 2020-12
+
+education:
+  - credential: MEng, Computer Engineering
+    institution: University of Waterloo
+    location: Waterloo, ON
+    start: 2022-09
+    end: 2023-12
+  - credential: BE, Computer Science
+    institution: Savitribai Phule Pune University
+    location: Pune, India
+    end: 2018-05
+
+summary:
+  ml_platform: >-
+    ML platform engineer with six years across data and backend systems, focused on
+    getting models served reliably and cheaply in production.
+  product_python: >-
+    Backend engineer with six years in Python and SQL, building APIs and data models
+    that stay correct under load.
+  research: >-
+    Engineer with six years in production ML and data systems, working on evaluation
+    and model quality alongside the platform that serves them.
+
+facts:
+  - id: f_serving_latency
+    role: r_ml
+    bullet: >-
+      Cut p99 inference latency from 840ms to 190ms by batching requests at the
+      serving layer and moving feature lookups to a Redis read-through cache.
+    shapes: [ml_platform, product_python]
+    skills: [python, redis, observability]
+    metrics: [latency, p99]
+    aliases: {caching: [redis, read-through cache]}
+    strength: 5
+
+  - id: f_feature_store
+    role: r_ml
+    bullet: >-
+      Built a feature pipeline in Airflow and Spark serving 40 models, replacing six
+      hand-maintained cron jobs and removing a recurring class of training-serving skew.
+    shapes: [ml_platform]
+    skills: [airflow, spark, python]
+    metrics: [models, skew]
+    strength: 5
+
+  - id: f_model_registry
+    role: r_ml
+    bullet: >-
+      Introduced MLflow tracking and a promotion gate, so every deployed model carries
+      its training data version, metrics and rollback target.
+    shapes: [ml_platform, research]
+    skills: [mlflow, model-evaluation, ci-cd]
+    metrics: [reproducibility]
+    strength: 4
+
+  - id: f_eval_harness
+    role: r_ml
+    bullet: >-
+      Wrote the offline evaluation harness the team now gates releases on, covering
+      slice metrics and a regression suite over 12 held-out cohorts.
+    shapes: [research, ml_platform]
+    skills: [python, model-evaluation, scikit-learn]
+    metrics: [slice metrics, regression]
+    strength: 5
+
+  - id: f_ab_testing
+    role: r_ml
+    bullet: >-
+      Ran the A/B programme for ranking changes, including the sequential test that
+      stopped a launch showing a 3% drop in downstream conversion.
+    shapes: [research, product_python]
+    skills: [ab-testing, python, sql]
+    metrics: [conversion]
+    strength: 4
+
+  - id: f_gpu_cost
+    role: r_ml
+    bullet: >-
+      Reduced GPU spend 38% by right-sizing inference instances and moving batch
+      scoring to spot capacity with checkpointed restarts.
+    shapes: [ml_platform]
+    skills: [aws, terraform, kubernetes]
+    metrics: [cost, gpu]
+    strength: 4
+
+  - id: f_transformer_finetune
+    role: r_ml
+    bullet: >-
+      Fine-tuned a transformer classifier for document routing, reaching 94% macro-F1
+      against a 78% baseline and shipping it behind a confidence threshold.
+    shapes: [research, ml_platform]
+    skills: [pytorch, transformers, model-evaluation]
+    metrics: [macro-f1, baseline]
+    strength: 5
+
+  - id: f_api_platform
+    role: r_backend
+    bullet: >-
+      Led the split of a Django monolith into four Python services behind a shared
+      gateway, keeping the public API stable through the migration.
+    shapes: [product_python, ml_platform]
+    skills: [python, docker, postgresql]
+    metrics: [services]
+    strength: 5
+
+  - id: f_query_tuning
+    role: r_backend
+    bullet: >-
+      Removed an N+1 read pattern and added covering indexes, taking the slowest
+      reporting endpoint from 11s to 700ms at the 95th percentile.
+    shapes: [product_python, ml_platform]
+    skills: [postgresql, sql, python]
+    metrics: [latency, p95]
+    strength: 5
+
+  - id: f_event_pipeline
+    role: r_backend
+    bullet: >-
+      Replaced nightly batch syncs with Kafka consumers, cutting data staleness from
+      18 hours to under 2 minutes for downstream consumers.
+    shapes: [product_python, ml_platform, research]
+    skills: [kafka, python, postgresql]
+    metrics: [staleness]
+    strength: 4
+
+  - id: f_oncall
+    role: r_backend
+    bullet: >-
+      Set up structured logging, tracing and alerting, reducing mean time to diagnose
+      production incidents from 45 minutes to 12.
+    shapes: [product_python, ml_platform]
+    skills: [observability, python, docker]
+    metrics: [mttd]
+    strength: 4
+
+  - id: f_typed_api
+    role: r_backend
+    bullet: >-
+      Moved request and response validation to typed schemas, eliminating a class of
+      serialisation bug that had caused three of the prior quarter's incidents.
+    shapes: [product_python]
+    skills: [python, typescript, ci-cd]
+    metrics: [incidents]
+    strength: 3
+
+  - id: f_warehouse
+    role: r_data
+    bullet: >-
+      Built the ingestion layer for a 4TB analytics warehouse, with schema contracts
+      that failed loudly at load time instead of silently corrupting downstream tables.
+    shapes: [product_python, ml_platform, research]
+    skills: [sql, airflow, python, postgresql]
+    metrics: [volume]
+    strength: 4
+
+  - id: f_forecasting
+    role: r_data
+    bullet: >-
+      Replaced a spreadsheet demand forecast with a gradient-boosted model, cutting
+      mean absolute percentage error from 22% to 9% across 300 SKUs.
+    shapes: [research, product_python]
+    skills: [scikit-learn, python, sql, model-evaluation]
+    metrics: [mape]
+    strength: 4
+
+  - id: f_dbt_tests
+    role: r_data
+    bullet: >-
+      Added data quality tests to 60 transformation models, catching upstream schema
+      drift before it reached the dashboards finance relied on.
+    shapes: [research, product_python, ml_platform]
+    skills: [sql, ci-cd, airflow]
+    metrics: [coverage]
+    strength: 3
+
+  - id: f_go_service
+    role: r_data
+    bullet: >-
+      Wrote a Go sidecar for high-volume event validation, holding 12k events per
+      second on a single node where the Python version managed 2k.
+    shapes: [product_python, ml_platform]
+    skills: [go, kafka, docker]
+    metrics: [throughput]
+    strength: 3

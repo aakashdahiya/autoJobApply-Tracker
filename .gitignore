@@ -6,6 +6,7 @@ token.json
 client_secret*.json
 profile.yaml
 resumes/
+out/
 *.sqlite
 *.sqlite3
 *.db
