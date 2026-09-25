@@ -101,6 +101,13 @@ class Application(Base):
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
 
+    # What the last push wrote into the sheet's editable cells. Keeping it is
+    # what lets the next pull tell a deliberate edit from an echo of our own
+    # write — without it, every sync would either ignore your edits or undo
+    # the database's.
+    sheet_status_written: Mapped[str | None] = mapped_column(String(40))
+    sheet_notes_written: Mapped[str | None] = mapped_column(Text)
+
     job: Mapped[Job] = relationship(back_populates="application")
     events: Mapped[list["Event"]] = relationship(
         back_populates="application", cascade="all, delete-orphan"

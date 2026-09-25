@@ -254,6 +254,49 @@ seven.
 30 7 * * * cd /srv/tracker && .venv/bin/python -m inbox.run --sync --ghost --digest
 ```
 
+## The Google Sheets mirror
+
+```bash
+python -m sheets.run --spreadsheet 1AbC...xyz     # the id from the sheet's URL
+```
+
+```
+ID | Company | Title                | Status    | Score | Shape          | Notes
+---+---------+----------------------+-----------+-------+----------------+------
+1  | Cohere  | Senior AI Engineer   | applied   | 100   | ai_engineer    |
+2  | Clio    | Backend Engineer     | tailored  | 83    | backend_python |
+3  | Jobber  | Full Stack Developer | interview | 74    | fullstack      |
+```
+
+**SQLite stays the source of truth. The sheet is a view you can edit in two columns** — Status
+and Notes — and nothing else travels back. That asymmetry is the design: three writers against
+a spreadsheet with no transactions and no unique constraints is exactly how this project would
+have corrupted itself.
+
+The sync is pull-then-push, and the pull has one rule that makes it safe: **a cell counts as
+your edit only when it differs from what the last push wrote there.** Without that memory the
+sync has two failure modes and no good one — ignore your edits, or re-apply stale cells over
+the database's own progress. An application moved to `rejected` by an email on Tuesday would
+be dragged back to `applied` every night by a cell nobody had touched in weeks. There is a test
+for exactly that.
+
+Everything else is defensive in the ordinary way: rows are matched by an `ID` column rather
+than by position, columns are found by header text so dragging one does not corrupt the sync,
+an unrecognised status is reported rather than applied, a row you typed by hand is left alone,
+and every status change pulled in is recorded as an event with `source="sheet"`.
+
+Run it after the nightly crawl:
+
+```cron
+0 2 * * *  .venv/bin/python -m discover.crawl --tailor-top 5
+15 2 * * * .venv/bin/python -m sheets.run --spreadsheet $TRACKER_SPREADSHEET_ID
+30 7 * * * .venv/bin/python -m inbox.run --sync --ghost --digest
+```
+
+> The mirror adds two columns to `applications`. There are no migrations yet, so if you already
+> have a `data/tracker.sqlite` from an earlier run, delete it and re-capture — there is nothing
+> in it worth keeping at this stage.
+
 ## Who to watch
 
 `discover/watchlist.yaml` holds 50 Canadian employers that hire Python, AI and backend

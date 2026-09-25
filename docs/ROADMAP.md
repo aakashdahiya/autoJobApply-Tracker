@@ -29,7 +29,7 @@ mangled prose.
 
 ---
 
-## Phase 1 — Capture and track — **done** (Sheets mirror deferred)
+## Phase 1 — Capture and track — **done**
 
 The minimum that beats a manual spreadsheet.
 
@@ -41,9 +41,12 @@ The minimum that beats a manual spreadsheet.
 - Sheets mirror: worker pushes all rows; `Status` and `Notes` sync back.
 
 **Done:** one keystroke on any job page saves the posting with company, title, locations,
-apply URL and source, deduped. The Sheets mirror is deferred until the Google OAuth consent is
-set up; the API and its SQLite store are the source of truth either way, so nothing depends on
-it. Verified end to end against a running server.
+apply URL and source, deduped. Verified end to end against a running server.
+
+The Sheets mirror is built too: `python -m sheets.run --spreadsheet <id>`. SQLite remains the
+source of truth and only Status and Notes travel back, with a cell counted as your edit only
+when it differs from what the last push wrote there — otherwise a stale cell re-applies itself
+over the database's own progress every night.
 
 ---
 
