@@ -27,7 +27,7 @@ def build_payload(
     selection: Selection,
     *,
     date_style: str = "tab",
-    work_auth_line: bool = True,
+    work_auth_line: bool = False,
 ) -> dict:
     """Flatten profile + selection into what the template expects."""
     identity = profile.identity
@@ -89,7 +89,7 @@ def render_pdf(
     out_path: str | Path,
     *,
     date_style: str = "tab",
-    work_auth_line: bool = True,
+    work_auth_line: bool = False,
 ) -> Path:
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -33,7 +33,13 @@ def main(argv: list[str] | None = None) -> int:
         help="tab: dates at the right margin, matching the source resume. "
         "inline: appended after the company, which no extractor can misread.",
     )
-    ap.add_argument("--no-work-auth-line", action="store_true")
+    ap.add_argument(
+        "--work-auth-line",
+        action="store_true",
+        help="print an 'Authorised to work in Canada' line under the contact details. "
+        "Off by default: the permit fields in profile.yaml answer the sponsorship "
+        "question on the application form, which is where it actually gets asked.",
+    )
     ap.add_argument(
         "--allow-rephrased",
         action="store_true",
@@ -74,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         selection,
         args.out,
         date_style=args.date_style,
-        work_auth_line=not args.no_work_auth_line,
+        work_auth_line=args.work_auth_line,
     )
     pdf_problems = verify_pdf(pdf, profile, selection)
     if pdf_problems:
@@ -109,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
             selection,
             args.docx,
             date_style=args.date_style,
-            work_auth_line=not args.no_work_auth_line,
+            work_auth_line=args.work_auth_line,
         )
         print(f"Wrote {docx}")
 

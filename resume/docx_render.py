@@ -79,7 +79,7 @@ def render_docx(
     out_path: str | Path,
     *,
     date_style: str = "tab",
-    work_auth_line: bool = True,
+    work_auth_line: bool = False,
 ) -> Path:
     data = build_payload(
         profile, selection, date_style=date_style, work_auth_line=work_auth_line

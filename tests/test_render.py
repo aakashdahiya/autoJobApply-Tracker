@@ -43,7 +43,7 @@ def test_inline_dates_remove_the_naive_parser_risk(profile, tmp_path):
     assert reading_order_risks(inline, selection) == []
 
 
-def test_pdf_carries_contact_details_and_work_auth_line(profile, tmp_path):
+def test_pdf_carries_contact_details(profile, tmp_path):
     selection = select(profile, Shape.ai_engineer)
     pdf = render_pdf(profile, selection, tmp_path / "r.pdf")
 
@@ -51,14 +51,21 @@ def test_pdf_carries_contact_details_and_work_auth_line(profile, tmp_path):
     assert normalise(profile.identity.name) in text
     assert normalise(profile.identity.email) in text
     assert normalise(selection.headline) in text
-    assert normalise("Authorised to work in Canada") in text
 
 
-def test_work_auth_line_can_be_turned_off(profile, tmp_path):
+def test_no_work_auth_line_by_default(profile, tmp_path):
+    """Work authorisation is answered on the form, not advertised on the resume."""
     selection = select(profile, Shape.ai_engineer)
-    pdf = render_pdf(profile, selection, tmp_path / "r.pdf", work_auth_line=False)
+    pdf = render_pdf(profile, selection, tmp_path / "r.pdf")
     text = normalise(extract_text(str(pdf), laparams=TRUE_ORDER))
     assert normalise("Authorised to work in Canada") not in text
+
+
+def test_work_auth_line_can_be_opted_into(profile, tmp_path):
+    selection = select(profile, Shape.ai_engineer)
+    pdf = render_pdf(profile, selection, tmp_path / "r.pdf", work_auth_line=True)
+    text = normalise(extract_text(str(pdf), laparams=TRUE_ORDER))
+    assert normalise("Authorised to work in Canada") in text
 
 
 def test_pdf_has_no_repeated_header_artifacts(profile, tmp_path):

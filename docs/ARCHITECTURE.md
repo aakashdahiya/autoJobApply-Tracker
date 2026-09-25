@@ -204,12 +204,10 @@ never a SIN — including these reads as unfamiliarity with the market and creat
 human-rights-compliance problem for the employer. Location as `City, ON` style. Two pages is
 normal and accepted here, so the page budget is not one page.
 
-**On stating work authorisation:** on an open work permit, one line near the top — "Authorised to
-work in Canada, open work permit valid to <date>" — removes the most common screening doubt on a
-Canadian application, and it is simply true. On an employer-specific permit the same line invites
-a question you would rather answer in conversation than have screened on, so leave it off the
-resume and handle it in the application's own authorisation fields. `permit_type` therefore drives
-the renderer as well as the answer bank.
+**On stating work authorisation:** off the resume by default. Every Canadian application asks
+about it in its own fields, which is where `permit_type` answers it; putting it on the resume as
+well only draws attention to a non-issue. `--work-auth-line` opts back in if a specific posting
+makes it worth pre-empting.
 
 ATS-safe rules the renderer enforces: single column; no tables, text boxes, icons, or
 multi-column headers; contact details in the body, never in a page header; standard section

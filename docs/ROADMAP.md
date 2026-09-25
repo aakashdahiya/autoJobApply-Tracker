@@ -180,10 +180,8 @@ assessment email reaches your phone within the hour.
 
 Nothing blocking Phase 1.
 
-1. **Work permit expiry date**, to fill `constraints.work_auth_expiry`. Currently null, so the
-   resume line reads "(PGWP)" without a date.
-2. **The Workday employers you care about**, to seed the company watchlist. Ten names is enough
-   to start detecting tenants against.
+1. **Target employers**, to seed the company watchlist — see §5 on tenant detection. Ten names
+   is enough to start.
 3. **Whether `profile.yaml` should be committed.** It is gitignored today because it holds
    personal data; committing it to a private repository would make the fact bank survive a fresh
    checkout.
