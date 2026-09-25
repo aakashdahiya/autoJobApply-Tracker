@@ -8,9 +8,9 @@ Rough effort assumes evenings and weekends, one person.
 
 ---
 
-## Phase 0 — Fact bank and renderer (~3 evenings)
+## Phase 0 — Fact bank and renderer — **done**
 
-The foundation everything else reads from.
+The foundation everything else reads from. Built and tested; see the README for usage.
 
 - `profile.yaml` schema (Pydantic) plus a filled-in template: every bullet from your history
   tagged with `shapes`, `skills`, `metrics`, `strength`, `aliases`.
@@ -21,9 +21,11 @@ The foundation everything else reads from.
 - **Test:** extract text back out of the generated PDF and assert it contains every rendered
   bullet, in order, with contact details present.
 
-**Done when:** `python -m resume.render --profile profile.yaml --shape ml_platform --out out.pdf`
-produces a resume you would actually send, the extraction test passes, and the depth check reports
-honestly on all three shapes.
+**Done:** `python -m resume.render --profile profile.yaml --shape ml_platform --out out.pdf`
+renders PDF and DOCX, the traceability and extraction checks both gate the output, and the depth
+check reports per shape. The extraction check earned itself on the first run — it caught
+right-aligned employment dates being extracted mid-bullet, which an ATS would have read as
+mangled prose.
 
 ---
 
