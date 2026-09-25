@@ -40,13 +40,23 @@ company, title, location, apply URL, and source — no duplicates.
 
 ---
 
-## Phase 2 — Assisted apply (~1 week)
+## Phase 2 — Assisted apply, Workday included (~2.5 weeks)
 
-The phase that actually saves the time.
+The phase that actually saves the time. Longer than the others because Workday is in it from the
+start, which is the right call for this market — see the cost note below.
 
 - Side-panel job queue: filter, sort, open apply URL.
-- Autofill adapters for Greenhouse, Lever, Ashby.
-- Leave voluntary self-identification and accommodation fields untouched; mark and skip them.
+- Shared field-map layer: `label-regex → profile key`, per-adapter overrides, click-then-pick
+  helpers for non-native dropdowns and typeaheads.
+- Autofill adapters for Greenhouse, Lever, Ashby — built first *within* this phase, because they
+  are two or three days total and they prove the field-map layer before Workday leans on it.
+- **Workday adapter** (~1.5 weeks on its own):
+  - `ats_accounts` + OS-keychain vault, one account per tenant.
+  - Resume-upload-then-correct flow: diff Workday's own parse against `profile.yaml` and fix the
+    deltas, rather than filling blanks.
+  - Resumable multi-step wizard with per-application step progress.
+  - "Use my last application" shortcut when `last_application_id` is set for that company.
+- `self_id` block honoured strictly: fill only fields explicitly set, mark and skip the rest.
 - `answers` bank for the recurring dozen questions, editable from the panel.
 - Resume attach: drag-and-drop from the panel plus direct file-input set where allowed.
 - Highlight every field the system touched; store each value in `events`.
@@ -56,9 +66,13 @@ The phase that actually saves the time.
 **Done when:** a Greenhouse application goes from panel to submitted in under 30 seconds and
 the status flips to `applied` by itself.
 
-**Canada note:** if your target list leans toward banks, telecoms and insurers, a Workday adapter
-earns its keep immediately rather than in Phase 6 — that is where much of the senior Python and
-AI hiring sits. Partial fill (steps 1–2, then hand over) is a real win there.
+**Cost of Workday-first, stated plainly:** the Workday adapter is roughly a week and a half
+against two or three days for the other three combined, so it pushes this phase from about one
+week to about two and a half. It is worth it here — the banks, their AI labs, the telecoms and
+the insurers are where much of Canada's senior Python and AI hiring sits, and the per-tenant
+account friction it removes is the worst part of applying there. Build the easy three first inside
+the phase so you are applying for real within days rather than waiting out the Workday work.
+Partial fill (steps 1–2, then hand over) counts as done for the first pass.
 
 ---
 
@@ -66,8 +80,10 @@ AI hiring sits. Partial fill (steps 1–2, then hand over) is a real win there.
 
 - JD extraction into a Pydantic schema, cached on `description_hash`.
 - Match scoring; threshold gate; skip reasons recorded.
-- Work-authorisation filter: postings that cannot sponsor are scored down or skipped when
-  `work_auth` calls for it, and permit expiry raises a flag against distant start dates.
+- Work-authorisation handling: no sponsorship needed, so no discovery filter — but the
+  sponsorship answer is *derived* from `permit_type`, and permit expiry raises a flag on distant
+  start dates and on long-cycle employers.
+- Multi-city requisition collapse: one job, a set of locations, one tailored resume.
 - Constrained tailoring (select → rephrase → validate) per §4 of the architecture.
 - The `fact_id` traceability validator, with tests for the failure cases: invented bullet,
   invented number, skill not in profile.
@@ -112,7 +128,9 @@ assessment email reaches your phone within the hour.
 
 ## Phase 6 — Hardening, once it is in daily use
 
-- Workday / Taleo adapters if not already pulled forward; partial-fill accepted as a win.
+- Workday adapter hardening: full-flow instead of partial fill, selector re-verification after
+  Workday releases.
+- Taleo — same account-per-employer problem, messier selectors.
 - iCIMS, BambooHR, Dayforce — the long tail, once you meet the same one twice.
 - GC Jobs profile sync, only if federal roles are in scope.
 - Field-mapping learning loop from your corrections.
@@ -124,21 +142,29 @@ assessment email reaches your phone within the hour.
 
 ## Decisions settled
 
-- **Market:** Canadian AI, tech and Python roles. Adapter and discovery priorities follow
-  §9 of the architecture; Workday matters more here than in a startup-only market.
+- **Market:** Canadian AI, tech and Python roles, country-wide.
 - **Backend:** Python + FastAPI, bound to `127.0.0.1`.
 - **Hosting:** localhost through Phase 3. Move to a small always-on VPS at Phase 4, when
   scheduled Gmail triage and nightly discovery need to run whether or not the laptop is awake.
   Add API auth as part of that move, not after it.
+- **Workday from day one**, alongside Greenhouse/Lever/Ashby in Phase 2. Accepted cost:
+  Phase 2 runs ~2.5 weeks instead of ~1.
+- **Work authorisation:** work permit, no sponsorship required. No discovery filter needed; the
+  sponsorship answer is derived from `permit_type`, and expiry drives start-date flags.
+- **Location:** Canada-wide, willing to relocate, remote or hybrid both fine. Location is out of
+  `dedupe_key`; multi-city reqs collapse to one job with a set of locations.
+- **Self-identification:** defaults to `prefer_not_to_say` on every field until you set it
+  explicitly. Nothing is inferred from the rest of your profile.
+- **French:** assumed `none` until told otherwise — French-required Quebec and federally
+  regulated postings are scored down, while Montreal's English-language AI roles stay in scope.
 
 ## Still open
 
-1. **Work authorisation status** — citizen, PR, PGWP, or needs sponsorship. This is not a
-   detail: it drives the discovery filter, the scoring adjustment, and whether the resume
-   should state status near the top.
-2. **Province and remote appetite** — which provinces count as local, and whether
-   Canada-remote-only postings are in or out.
-3. **Role shape weighting** — research-adjacent ML, ML/platform engineering, or product
-   Python. Most people want two of the three; the third is a distraction worth filtering out.
-4. **French proficiency**, which decides whether Quebec and federally-regulated postings are
-   worth scoring at all.
+1. **Permit type — open (PGWP or spousal) or employer-specific?** The one genuinely blocking
+   question. It decides how the sponsorship question is answered on every application, and
+   whether the resume carries a work-authorisation line at all.
+2. **Permit expiry window**, which sets how aggressively to flag long-cycle employers.
+3. **Role shape weighting** — research-adjacent ML, ML/platform engineering, or product Python.
+   Drives how the Phase 0 fact bank is tagged, so it is needed before the first line of code.
+4. **Self-identification default** — leave every field at `prefer_not_to_say`, or disclose where
+   asked. Entirely your call; the system will not guess either way.

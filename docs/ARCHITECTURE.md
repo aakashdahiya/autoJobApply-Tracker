@@ -60,9 +60,10 @@ until it has auth.
 
 ```
 companies      id, name, name_norm, domain, ats_type, careers_url, watchlist(bool)
-jobs           id, company_id, title, title_norm, location, remote_type, seniority,
+jobs           id, company_id, title, title_norm, locations(json), remote_type, seniority,
                description_raw, description_hash, apply_url, canonical_url, source,
                posted_at, discovered_at, salary_min, salary_max, dedupe_key, is_open
+               -- locations is a SET: enterprises post one req across several cities
 
 applications   id, job_id, status, match_score, resume_version_id, applied_at,
                last_status_change_at, next_action, next_action_due, notes, sheet_row
@@ -79,15 +80,31 @@ events         id, application_id, kind, source, occurred_at, payload(json)
 
 email_links    id, gmail_message_id, gmail_thread_id, application_id, classification,
                confidence, extracted(json), reviewed(bool)
+
+ats_accounts   id, company_id, ats_type, tenant_url, username, secret_ref,
+               profile_last_synced_at, last_application_id, notes
+               -- one row per Workday/Taleo tenant, because each employer is a separate
+               -- account. secret_ref points into the OS keychain; there is no password
+               -- column, and credentials never touch the database or the repo.
 ```
 
-**Dedupe key** — the same job appears on LinkedIn, the company site, and a job board.
-`dedupe_key = sha1(company_name_norm + "|" + title_norm + "|" + location_norm)`, where
-normalisation lowercases, strips punctuation, drops seniority noise (`Sr.` → `senior`), and
-canonicalises locations (`Toronto, ON`/`Greater Toronto Area`/`GTA` → one token;
-`Montréal`/`Montreal`/`MTL` → one token; `Remote - Canada`/`Remote (Canada)` → one token).
-A second `description_hash`
-catches reposts of the same listing under a new ID.
+**Dedupe key** — the same job appears on LinkedIn, the company site, and a job board, and
+**location is deliberately not part of the key**:
+
+`dedupe_key = sha1(company_name_norm + "|" + title_norm)`
+
+Normalisation lowercases, strips punctuation, and drops seniority noise (`Sr.` → `senior`).
+A second `description_hash` confirms the match and catches reposts of the same listing under a
+new ID.
+
+Leaving location out is the right call for a Canada-wide search, because enterprises — Workday
+tenants especially — publish one requisition separately for Toronto, Vancouver, Calgary and
+Montreal. Keying on location turns one job into five rows and five near-identical tailored
+resumes. Instead, a matching company + title + description hash collapses into **one job with a
+set of locations**, and city-name variants (`Toronto, ON`/`Greater Toronto Area`/`GTA`;
+`Montréal`/`Montreal`/`MTL`; `Remote - Canada`/`Remote (Canada)`) canonicalise inside that set.
+The rare false collapse — a genuinely different role sharing a title at one company — is caught
+by the description hash and is much cheaper than the duplicate flood it prevents.
 
 **Application state machine:**
 
@@ -116,13 +133,26 @@ This is the part most such projects get wrong, so it is specified tightly.
 ```yaml
 identity:   { name: …, email: …, phone: …, links: {…} }
 constraints:
-  work_auth:        citizen | pr | work_permit | pgwp | needs_sponsorship
-  work_auth_expiry: 2027-04-30        # only if permit-based
-  provinces:        [ON, BC, remote-canada]
+  work_auth:         work_permit
+  permit_type:       open | employer_specific   # derives the sponsorship answer — see §9
+  work_auth_expiry:  2027-04-30
+  pr_application:    none | in_progress | ...   # say so if it is in progress
+  citizenship:       India
+  credential_assessment: null                   # WES ECA reference, if you hold one
+  provinces:         [canada-wide]
+  work_modes:        [remote, hybrid, onsite]
+  relocate_within_canada: true
   expected_base_cad: { min: 120000, target: 145000 }
   notice_period_days: 30
-  french_level:     none | basic | working | fluent
-  relocate_within_canada: true
+  french_level:      none
+
+self_id:                        # voluntary; filled ONLY where explicitly set
+  default:          prefer_not_to_say
+  gender:           prefer_not_to_say
+  indigenous:       prefer_not_to_say
+  racialized:       prefer_not_to_say
+  disability:       prefer_not_to_say
+  veteran:          prefer_not_to_say
 
 facts:
   - id: f_pay_latency
@@ -165,9 +195,14 @@ for it, and a few parse it more reliably than PDF.
 **Canadian resume conventions the renderer bakes in:** no photo, no date of birth, no marital
 status, and never a SIN — including these reads as unfamiliarity with the market and invites a
 human-rights-compliance problem for the employer. Location as `City, ON` style. Two pages is
-normal and accepted here, so the page budget is not one page. If you hold citizenship or PR,
-state it in one line near the top — it is a true fact about you and it removes the single most
-common screening doubt on a Canadian application.
+normal and accepted here, so the page budget is not one page.
+
+**On stating work authorisation:** on an open work permit, one line near the top — "Authorised to
+work in Canada, open work permit valid to <date>" — removes the most common screening doubt on a
+Canadian application, and it is simply true. On an employer-specific permit the same line invites
+a question you would rather answer in conversation than have screened on, so leave it off the
+resume and handle it in the application's own authorisation fields. `permit_type` therefore drives
+the renderer as well as the answer bank.
 
 ATS-safe rules the renderer enforces: single column; no tables, text boxes, icons, or
 multi-column headers; contact details in the body, never in a page header; standard section
@@ -184,21 +219,66 @@ File naming: `Aakash_Dahiya_{Company}_{Role}.pdf`, with the version row keeping 
 time, which is worse than useless because you stop trusting it. Detect the ATS from the URL
 and a DOM fingerprint, then run its adapter.
 
-Build order by coverage-per-effort:
+Build order, with **Workday first** per your call:
 
-1. **Greenhouse, Lever, Ashby** — stable DOM, single-page forms, standard file inputs. Covers
-   most startup and mid-market roles. Start here.
-2. **Workable, SmartRecruiters, Zoho Recruit** — same shape, slightly messier.
-3. **Workday and Taleo** — multi-step, stateful, account-per-company. Real work, and normally
-   the thing to defer. **In Canada it is worth pulling forward**, because a large share of
-   senior Python and AI hiring sits behind it: the big five banks and their AI labs, the
-   telecoms, and the large insurers all run Workday or Taleo. Treat "fill steps 1 and 2, hand
-   over" as a legitimate win — the account-creation step alone is most of the friction.
-4. **iCIMS, BambooHR, Dayforce** — the long tail. Only worth it once you see the same one twice.
-5. **GC Jobs (jobs.gc.ca)** — the federal public service runs its own portal with a persistent
+1. **Workday** — the largest single share of senior Python and AI hiring in the Canadian
+   enterprise market: the big five banks and their AI labs, the telecoms, the large insurers.
+   Also by far the hardest, so it gets its own subsection below.
+2. **Greenhouse, Lever, Ashby** — stable DOM, single-page forms, standard file inputs. Cover
+   most scale-up and AI-lab roles. Build these *in the same phase* as Workday, not after: they
+   are cheap once the field-map layer exists, and they give you working applications in week one
+   while the Workday adapter is still maturing.
+3. **Workable, SmartRecruiters, Zoho Recruit** — same shape as the group above, slightly messier.
+4. **Taleo** — still common at Canadian banks and older enterprises. Shares Workday's
+   account-per-employer problem without sharing its selector discipline.
+5. **iCIMS, BambooHR, Dayforce** — the long tail. Only worth it once you see the same one twice.
+6. **GC Jobs (jobs.gc.ca)** — the federal public service runs its own portal with a persistent
    applicant profile, bilingual-requirement fields, and screening questions that must be
    answered in prose. Profile-sync problem, not a form-fill problem. Lowest priority unless
    you are targeting federal roles.
+
+### Workday, specifically
+
+Workday inverts the usual autofill problem, and the adapter has to be built around that fact.
+
+**It parses your resume and then fills the form itself — badly.** The flow is: upload resume →
+Workday auto-populates work history, education and skills from its own parse → the parse is
+routinely wrong about dates, employer names, and bullet boundaries. So the adapter's real job is
+not filling empty fields, it is **diffing Workday's parsed state against `profile.yaml` and
+correcting the deltas**. Build it that way from the start; a fill-the-blanks design will fight the
+platform the whole way.
+
+**Every employer is a separate tenant and a separate account.** URLs look like
+`<employer>.wdN.myworkdayjobs.com/<site>`, and each one wants its own username and password. This
+is the single largest source of friction in Canadian enterprise applying, and therefore the
+single largest win available: the `ats_accounts` table plus an OS-keychain vault means you never
+reset a Workday password again. Credentials live in the keychain, referenced by `secret_ref` —
+never in the database, never in the repo, never in extension storage.
+
+**The good news: selectors are stable.** Workday annotates its DOM with `data-automation-id`
+attributes, which are far more reliable to target than its generated CSS classes. One adapter
+generalises across tenants because the widget set is shared. Verify the specific ids against two or
+three live tenants before trusting them, and re-verify after Workday releases — they do change.
+
+**Widgets are not native controls.** Dropdowns are custom listboxes, not `<select>`, and typeahead
+fields need a real input event followed by an option click. Setting `.value` directly does nothing.
+Plan for click-then-pick helpers as a shared primitive.
+
+**The wizard is multi-step and stateful:** My Information → My Experience → Application Questions
+→ Voluntary Disclosures → Self Identify → Review. Each step saves separately and any of them can
+reject and bounce you back. The adapter must therefore be **resumable** — store per-application
+step progress, so an interrupted application continues instead of restarting.
+
+**Use the platform's own shortcut.** Within a tenant, Workday offers to reuse your last
+application. When `ats_accounts.last_application_id` is set for that company, take it — it is
+faster and more accurate than anything the adapter can do, and it leaves you only the
+job-specific answers and the tailored resume to swap in.
+
+**Honest cost:** this adapter is roughly a week and a half on its own, against two or three days
+for Greenhouse, Lever and Ashby combined. Building it first delays your first fully-assisted
+application by about a week. That is why the easy three ship in the same phase — you get a
+working loop immediately and the Workday work lands on top of a proven field-map layer rather
+than inventing one.
 
 **Mechanics:**
 - The panel holds the tailored resume ready to drag onto the form's file input, and can also
@@ -206,13 +286,17 @@ Build order by coverage-per-effort:
 - Field mapping is `label-regex → profile key`, with per-adapter overrides and a learning
   loop: when you correct a filled field, the correction is stored and reused.
 - The recurring dozen come from the `answers` bank, not from a model. In the Canadian market
-  that set is: are you legally entitled to work in Canada; status (citizen / PR / work permit,
-  and expiry); do you require sponsorship; province and willingness to relocate within Canada;
-  French proficiency; expected base salary in CAD; notice period; referral source; "how did you
-  hear about us".
-- **Never auto-fill voluntary self-identification** — employment-equity questions (Indigenous
-  identity, visible minority, disability, veteran status) and accommodation requests are left
-  blank for you to answer or skip yourself. The adapter marks them and moves on.
+  that set is: are you legally entitled to work in Canada (yes); do you require sponsorship
+  (derived from `permit_type`, never hardcoded — see §9); permit type and expiry; country of
+  citizenship; willingness to relocate within Canada (yes) and acceptable work modes; French
+  proficiency; expected base salary in CAD; notice period; referral source; "how did you hear
+  about us".
+- **Voluntary self-identification is opt-in per field, and off by default.** Employment-equity
+  questions (Indigenous identity, racialised/visible minority, disability, veteran status),
+  gender, and accommodation requests are filled *only* from an explicit `self_id` block whose
+  default is `prefer_not_to_say`. Anything not explicitly set is marked and skipped for you to
+  handle. Whether to disclose is yours to decide, never the system's to infer from anything else
+  in your profile.
 - Genuinely novel free-text ("why this company") is drafted, then visibly marked as a draft.
   Anything the system wrote is outlined so you know what to actually read.
 - **It never clicks submit.** After you submit, the adapter detects the confirmation page or
@@ -258,6 +342,9 @@ anything needing a reply, and the orphan bucket. Plus immediate pushes for
   `dedupe_key`; the Gmail sweep is keyed on `gmail_message_id`.
 - **Quality ceiling:** cap applications per day. Fifteen well-targeted applications beat
   ninety sprayed ones, and the response rate difference is not subtle.
+- **Credentials never leave the keychain.** Workday and Taleo accounts are referenced by
+  `secret_ref` only. No password columns, nothing in extension storage, nothing in the repo, and
+  no credentials in `events` payloads.
 - **Audit everything:** `events` is append-only. When you wonder "why does it think I applied
   to this," the answer is in the table.
 
@@ -294,17 +381,49 @@ The target market is Canadian AI, software and Python roles. That shapes four th
 4. **Company careers pages** for employers that run neither a known ATS nor a feed. Last resort,
    one polite request a day.
 
-### Work authorisation is the dominant screening filter
+### Work authorisation: work permit, no sponsorship required
 
-Nearly every Canadian application asks whether you are legally entitled to work in Canada, and a
-large fraction of postings state that they cannot sponsor. So `work_auth` is not just an answer to
-autofill — it is a **filter on discovery**:
+Your status is a work permit with no sponsorship needed, which turns the discovery filter into
+nearly a no-op — postings that say "must be legally entitled to work in Canada without
+sponsorship" stay in scope. Two things still need encoding, and the first is a trap.
 
-- If you are a citizen or PR, the filter is a no-op and you should state the status on the resume.
-- If you are on a PGWP or an employer-specific permit, postings that require authorisation
-  without sponsorship get scored down or skipped, and permit expiry feeds a warning when a
-  posting's start date sits close to it.
-- Never store a SIN anywhere in this system, and never let it be autofilled.
+**Open versus employer-specific.** "I do not require sponsorship" is accurate on an **open**
+permit — a PGWP, or a spousal open work permit. On an **employer-specific (closed)** permit,
+moving employers requires a new work permit and often an LMIA, which is functionally the thing
+employers mean by sponsorship. Answering "no sponsorship required" in that case is wrong, and it
+surfaces at the offer or background-check stage, which is the worst possible moment to discover it.
+So `permit_type` is a required profile field, and the answer bank **derives** the sponsorship
+answer from it rather than storing a flat "no".
+
+**Expiry is itself a screening signal.** Store `work_auth_expiry` and surface it twice: as a
+warning when a posting's start date sits close to it, and as a flag on long-cycle employers —
+banks, insurers and federal-adjacent roles run multi-month processes with background checks
+stacked on the end. If yours is a PGWP, note that it is single-use and non-renewable, so the
+expiry is a wall rather than a renewal date; if a PR application is in progress, that status is
+often the strongest single line you can give a hiring manager, and it belongs in the answer bank.
+
+**Constant answers** that go in the bank on day one: legally entitled to work in Canada — yes;
+requires sponsorship — derived from `permit_type`; permit type and expiry; country of citizenship
+— India.
+
+**Credential equivalency.** A degree earned in India occasionally draws a "Canadian equivalency"
+question. If you hold a WES ECA, put its reference in `credential_assessment`; if not, the honest
+answer is the degree as awarded, which is rarely a blocker in tech.
+
+**Never store or autofill a SIN**, and never put one in `profile.yaml`.
+
+### Location: Canada-wide, and what that costs
+
+Canada-wide with relocation, and remote or hybrid both acceptable, means the location filter is
+effectively off. That simplifies the adapters, but it has two consequences worth building for now
+rather than patching later:
+
+- **Volume rises sharply.** The score gate stops being a cost optimisation and becomes the main
+  thing keeping the queue usable. Expect to tune the threshold during the first week of real use,
+  and to want a per-day application cap sooner than you think.
+- **Multi-city requisitions must collapse.** This is why `dedupe_key` excludes location (§3).
+  Without that, a single Workday req posted for four cities becomes four rows and four
+  near-identical tailored resumes — and four chances to apply twice to the same job.
 
 ### Compensation and language
 
