@@ -1,0 +1,13 @@
+{
+  "name": "job-tracker-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MV3 extension. No build step: load extension/ unpacked in Chrome.",
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}

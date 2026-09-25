@@ -48,6 +48,34 @@ Present** uploads." The layout is kept because it is the established format and 
 parser reads it correctly; `--date-style inline` removes the risk for anyone who would rather
 not take it.
 
+## Phase 1 is built: capture and track
+
+Start the tracker, then load the extension:
+
+```bash
+.venv/bin/uvicorn api.main:app --host 127.0.0.1 --port 8765 --reload
+```
+
+In Chrome: `chrome://extensions` → Developer mode → **Load unpacked** → pick `extension/`.
+There is no build step. Click the toolbar icon for the queue, or press **Ctrl+Shift+S**
+(**Cmd+Shift+S** on a Mac) on any job posting to save it.
+
+What the capture does, in order: read the page's schema.org `JobPosting` JSON-LD, fill any
+gaps from a site adapter (Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Workable,
+LinkedIn, Indeed), then fall back to Open Graph and `<title>` so an unknown careers page
+still captures. It only reads the page you are already looking at, in your own session —
+no crawling and no logins.
+
+Dedupe is the part that matters. `Sr. ML Eng @ Cohere Inc.` in Toronto and
+`Senior Machine Learning Engineer @ cohere` in Vancouver are **one job with two locations**,
+not two rows. And if you already applied, re-capturing warns you instead of letting you
+apply twice.
+
+```bash
+.venv/bin/python -m pytest          # 86 backend tests
+npm test --prefix extension         # 12 capture tests against real DOMs
+```
+
 ## Who to watch
 
 `discover/watchlist.yaml` holds 50 Canadian employers that hire Python, AI and backend

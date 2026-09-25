@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Job Tracker</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header>
+      <button id="capture" class="primary">Save this job</button>
+      <div id="stats" class="stats"></div>
+    </header>
+
+    <div class="filters">
+      <input id="search" type="search" placeholder="Filter by title…" />
+      <select id="status">
+        <option value="">All statuses</option>
+        <option value="open">Open only</option>
+        <option value="discovered">Discovered</option>
+        <option value="ready">Ready</option>
+        <option value="applied">Applied</option>
+        <option value="interview">Interview</option>
+        <option value="rejected">Rejected</option>
+      </select>
+    </div>
+
+    <p id="message" class="message" hidden></p>
+    <ul id="jobs" class="jobs"></ul>
+
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

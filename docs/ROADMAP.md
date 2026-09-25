@@ -29,7 +29,7 @@ mangled prose.
 
 ---
 
-## Phase 1 — Capture and track (~4 evenings)
+## Phase 1 — Capture and track — **done** (Sheets mirror deferred)
 
 The minimum that beats a manual spreadsheet.
 
@@ -40,8 +40,10 @@ The minimum that beats a manual spreadsheet.
 - Dedupe on `dedupe_key`.
 - Sheets mirror: worker pushes all rows; `Status` and `Notes` sync back.
 
-**Done when:** you can hit one key on any job page and the row appears in your sheet with
-company, title, location, apply URL, and source — no duplicates.
+**Done:** one keystroke on any job page saves the posting with company, title, locations,
+apply URL and source, deduped. The Sheets mirror is deferred until the Google OAuth consent is
+set up; the API and its SQLite store are the source of truth either way, so nothing depends on
+it. Verified end to end against a running server.
 
 ---
 

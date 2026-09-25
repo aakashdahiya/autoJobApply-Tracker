@@ -1,0 +1,58 @@
+:root {
+  --bg: #ffffff;
+  --fg: #16181d;
+  --muted: #5c6370;
+  --line: #e3e6eb;
+  --accent: #2d5be3;
+  --applied: #0f7b4f;
+  --warn: #b4530a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181d; --fg: #e8eaee; --muted: #9aa2b1; --line: #2a2e37;
+    --accent: #7ea1ff; --applied: #4ec38a; --warn: #e0a05c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 12px;
+  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--bg); color: var(--fg);
+}
+header { display: flex; flex-direction: column; gap: 8px; }
+button {
+  font: inherit; cursor: pointer; border-radius: 6px;
+  border: 1px solid var(--line); background: transparent; color: var(--fg);
+  padding: 4px 8px;
+}
+button.primary {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+  font-weight: 600; padding: 9px 12px;
+}
+button:hover { filter: brightness(1.08); }
+.stats { color: var(--muted); font-size: 12px; }
+.filters { display: flex; gap: 6px; margin: 10px 0; }
+.filters input, .filters select {
+  font: inherit; padding: 5px 7px; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+}
+.filters input { flex: 1; min-width: 0; }
+.message {
+  padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line);
+  color: var(--muted); margin: 0 0 10px;
+}
+.message.warn { color: var(--warn); border-color: var(--warn); }
+.jobs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.job { border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
+.job h3 { margin: 0 0 2px; font-size: 13px; }
+.job h3 a { color: inherit; text-decoration: none; }
+.job h3 a:hover { text-decoration: underline; }
+.job .meta { color: var(--muted); font-size: 12px; margin-bottom: 7px; }
+.job .row { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+.badge {
+  font-size: 11px; padding: 1px 7px; border-radius: 99px;
+  border: 1px solid var(--line); color: var(--muted);
+}
+.badge.applied, .badge.interview, .badge.offer { color: var(--applied); border-color: var(--applied); }
+.badge.rejected, .badge.ghosted { opacity: 0.65; }
+.empty { color: var(--muted); text-align: center; padding: 28px 8px; }

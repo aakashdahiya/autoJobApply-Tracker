@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Job Tracker",
+  "version": "0.1.0",
+  "description": "Save job postings to your local tracker, and see the queue while you apply.",
+  "permissions": ["activeTab", "scripting", "storage", "sidePanel", "notifications"],
+  "host_permissions": ["http://127.0.0.1:8765/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Job Tracker — click for the queue" },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "commands": {
+    "capture-job": {
+      "suggested_key": { "default": "Ctrl+Shift+S", "mac": "Command+Shift+S" },
+      "description": "Save the job posting on this page"
+    }
+  }
+}
