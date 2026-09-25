@@ -12,15 +12,18 @@ Rough effort assumes evenings and weekends, one person.
 
 The foundation everything else reads from.
 
-- `profile.yaml` with every bullet from your history, tagged with `skills`, `metrics`,
-  `strength`, `aliases`.
-- Typst template + `render.py` → ATS-safe PDF.
+- `profile.yaml` schema (Pydantic) plus a filled-in template: every bullet from your history
+  tagged with `shapes`, `skills`, `metrics`, `strength`, `aliases`.
+- Typst template + `render.py` → ATS-safe PDF, with the work-authorisation line driven by
+  `permit_type`.
 - DOCX renderer from the same source.
+- Per-shape depth check: warn when a shape has too few strong facts to fill a resume.
 - **Test:** extract text back out of the generated PDF and assert it contains every rendered
   bullet, in order, with contact details present.
 
-**Done when:** `python -m resume.render --profile profile.yaml --out master.pdf` produces a
-resume you would actually send, and the extraction test passes.
+**Done when:** `python -m resume.render --profile profile.yaml --shape ml_platform --out out.pdf`
+produces a resume you would actually send, the extraction test passes, and the depth check reports
+honestly on all three shapes.
 
 ---
 
@@ -56,7 +59,9 @@ start, which is the right call for this market — see the cost note below.
     deltas, rather than filling blanks.
   - Resumable multi-step wizard with per-application step progress.
   - "Use my last application" shortcut when `last_application_id` is set for that company.
-- `self_id` block honoured strictly: fill only fields explicitly set, mark and skip the rest.
+- `self_id` filled from canonical values with a **per-adapter category map** — Canadian
+  employment-equity wording versus US EEO-1 wording are not interchangeable. Mark and skip
+  wherever no confident mapping exists.
 - `answers` bank for the recurring dozen questions, editable from the panel.
 - Resume attach: drag-and-drop from the panel plus direct file-input set where allowed.
 - Highlight every field the system touched; store each value in `events`.
@@ -84,6 +89,8 @@ Partial fill (steps 1–2, then hand over) counts as done for the first pass.
   sponsorship answer is *derived* from `permit_type`, and permit expiry raises a flag on distant
   start dates and on long-cycle employers.
 - Multi-city requisition collapse: one job, a set of locations, one tailored resume.
+- JD **shape classifier**: assigns one primary shape per posting, so each tailored resume is
+  single-shaped even though the fact bank covers all three.
 - Constrained tailoring (select → rephrase → validate) per §4 of the architecture.
 - The `fact_id` traceability validator, with tests for the failure cases: invented bullet,
   invented number, skill not in profile.
@@ -149,22 +156,25 @@ assessment email reaches your phone within the hour.
   Add API auth as part of that move, not after it.
 - **Workday from day one**, alongside Greenhouse/Lever/Ashby in Phase 2. Accepted cost:
   Phase 2 runs ~2.5 weeks instead of ~1.
-- **Work authorisation:** work permit, no sponsorship required. No discovery filter needed; the
-  sponsorship answer is derived from `permit_type`, and expiry drives start-date flags.
+- **Work authorisation:** PGWP, an open permit with more than two years left. No sponsorship
+  required and no expiry flagging for now, though the flagging logic ships dormant since a PGWP is
+  single-use and non-renewable. The resume carries an authorisation line.
 - **Location:** Canada-wide, willing to relocate, remote or hybrid both fine. Location is out of
   `dedupe_key`; multi-city reqs collapse to one job with a set of locations.
-- **Self-identification:** defaults to `prefer_not_to_say` on every field until you set it
-  explicitly. Nothing is inferred from the rest of your profile.
+- **Self-identification:** disclose where asked — man, not Indigenous, racialized (South Asian),
+  no disability, not a veteran. Stored canonically and mapped per ATS; never inferred from
+  anything else in the profile.
+- **Role shapes:** all three in the fact bank, but **one shape per application**, chosen by a JD
+  classifier. Breadth in the bank, focus on every rendered resume.
 - **French:** assumed `none` until told otherwise — French-required Quebec and federally
   regulated postings are scored down, while Montreal's English-language AI roles stay in scope.
 
 ## Still open
 
-1. **Permit type — open (PGWP or spousal) or employer-specific?** The one genuinely blocking
-   question. It decides how the sponsorship question is answered on every application, and
-   whether the resume carries a work-authorisation line at all.
-2. **Permit expiry window**, which sets how aggressively to flag long-cycle employers.
-3. **Role shape weighting** — research-adjacent ML, ML/platform engineering, or product Python.
-   Drives how the Phase 0 fact bank is tagged, so it is needed before the first line of code.
-4. **Self-identification default** — leave every field at `prefer_not_to_say`, or disclose where
-   asked. Entirely your call; the system will not guess either way.
+Nothing blocking. What is needed next is content rather than decisions:
+
+1. **Your actual career facts**, to fill the Phase 0 `profile.yaml` template. The system cannot
+   invent these by design — the traceability validator exists precisely to stop it.
+2. **Target compensation** in CAD, and your notice period if you are currently employed.
+3. **The Workday tenants you care about**, to seed the company watchlist. Even ten names is
+   enough to start.

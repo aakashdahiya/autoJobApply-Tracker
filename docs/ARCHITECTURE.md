@@ -134,25 +134,26 @@ This is the part most such projects get wrong, so it is specified tightly.
 identity:   { name: …, email: …, phone: …, links: {…} }
 constraints:
   work_auth:         work_permit
-  permit_type:       open | employer_specific   # derives the sponsorship answer — see §9
-  work_auth_expiry:  2027-04-30
-  pr_application:    none | in_progress | ...   # say so if it is in progress
+  permit_type:       open                       # PGWP — derives the sponsorship answer, §9
+  permit_subtype:    pgwp
+  work_auth_expiry:  YYYY-MM-DD                 # >2 years out, so no start-date flagging
   citizenship:       India
   credential_assessment: null                   # WES ECA reference, if you hold one
   provinces:         [canada-wide]
   work_modes:        [remote, hybrid, onsite]
   relocate_within_canada: true
-  expected_base_cad: { min: 120000, target: 145000 }
+  expected_base_cad: { min: …, target: … }
   notice_period_days: 30
   french_level:      none
 
-self_id:                        # voluntary; filled ONLY where explicitly set
-  default:          prefer_not_to_say
-  gender:           prefer_not_to_say
-  indigenous:       prefer_not_to_say
-  racialized:       prefer_not_to_say
-  disability:       prefer_not_to_say
-  veteran:          prefer_not_to_say
+self_id:                        # voluntary, disclosed; canonical values — §5 maps per ATS
+  mode:             disclose
+  gender:           man
+  indigenous:       no
+  racialized:       yes
+  racialized_group: south_asian
+  disability:       no
+  veteran:          no
 
 facts:
   - id: f_pay_latency
@@ -291,12 +292,17 @@ than inventing one.
   citizenship; willingness to relocate within Canada (yes) and acceptable work modes; French
   proficiency; expected base salary in CAD; notice period; referral source; "how did you hear
   about us".
-- **Voluntary self-identification is opt-in per field, and off by default.** Employment-equity
-  questions (Indigenous identity, racialised/visible minority, disability, veteran status),
-  gender, and accommodation requests are filled *only* from an explicit `self_id` block whose
-  default is `prefer_not_to_say`. Anything not explicitly set is marked and skipped for you to
-  handle. Whether to disclose is yours to decide, never the system's to infer from anything else
-  in your profile.
+- **Voluntary self-identification is filled only from the explicit `self_id` block**, never
+  inferred from anything else in your profile. Disclosure is currently on. The block stores
+  *canonical* values and each adapter maps them to that ATS's own option strings, because the
+  wording diverges more than you would expect: a Canadian employer asks about **visible minority
+  / racialized person** under employment-equity categories where `south_asian` is a listed group,
+  while a US-headquartered company hiring into Canada often ships US EEO-1 wording instead — a
+  coarser race/ethnicity list, a separate Hispanic/Latino question, veteran status defined against
+  the US armed forces, and disability asked through form CC-305. A single stored string cannot
+  serve both, so the mapping lives per adapter.
+- **Where no confident mapping exists, mark and skip** rather than guess at a category. Same for
+  accommodation-request fields, which are situational and stay yours to answer.
 - Genuinely novel free-text ("why this company") is drafted, then visibly marked as a draft.
   Anything the system wrote is outlined so you know what to actually read.
 - **It never clicks submit.** After you submit, the adapter detects the confirmation page or
@@ -387,20 +393,19 @@ Your status is a work permit with no sponsorship needed, which turns the discove
 nearly a no-op — postings that say "must be legally entitled to work in Canada without
 sponsorship" stay in scope. Two things still need encoding, and the first is a trap.
 
-**Open versus employer-specific.** "I do not require sponsorship" is accurate on an **open**
-permit — a PGWP, or a spousal open work permit. On an **employer-specific (closed)** permit,
-moving employers requires a new work permit and often an LMIA, which is functionally the thing
-employers mean by sponsorship. Answering "no sponsorship required" in that case is wrong, and it
-surfaces at the offer or background-check stage, which is the worst possible moment to discover it.
-So `permit_type` is a required profile field, and the answer bank **derives** the sponsorship
-answer from it rather than storing a flat "no".
+**Settled: PGWP, which is an open permit.** You can work for any employer, so "no, I do not
+require sponsorship" is accurate, and the resume carries the authorisation line. `permit_type`
+stays a field rather than a hardcoded answer, because the logic differs sharply for the closed
+case: on an **employer-specific** permit, changing employers needs a new permit and often an
+LMIA, which is functionally what employers mean by sponsorship, and answering "no" there surfaces
+at the offer or background-check stage. The answer bank therefore **derives** the sponsorship
+answer from `permit_type` instead of storing a flat "no".
 
-**Expiry is itself a screening signal.** Store `work_auth_expiry` and surface it twice: as a
-warning when a posting's start date sits close to it, and as a flag on long-cycle employers —
-banks, insurers and federal-adjacent roles run multi-month processes with background checks
-stacked on the end. If yours is a PGWP, note that it is single-use and non-renewable, so the
-expiry is a wall rather than a renewal date; if a PR application is in progress, that status is
-often the strongest single line you can give a hiring manager, and it belongs in the answer bank.
+**Expiry: more than two years out, so flagging is off.** No start-date warnings and no long-cycle
+employer flags — banks and insurers with four-month processes are fully in scope. Keep
+`work_auth_expiry` populated anyway, because a PGWP is single-use and non-renewable: the date is a
+wall, not a renewal, and the flagging logic should switch itself on as the window closes rather
+than need building later.
 
 **Constant answers** that go in the bank on day one: legally entitled to work in Canada — yes;
 requires sponsorship — derived from `permit_type`; permit type and expiry; country of citizenship
@@ -434,11 +439,22 @@ and an honest answer rather than an optimistic one.
 
 ### Role-shape notes for AI and Python work
 
-Canadian AI hiring splits into three shapes that want visibly different resumes, which is exactly
-what the tailoring pipeline is for: **research-adjacent** roles (publications, methods, benchmarks),
-**ML/platform engineering** (pipelines, serving, latency, cost), and **product Python/backend**
-(APIs, data models, reliability). Tag your `facts` so all three are well covered, and let the score
-gate tell you which shape a given JD actually is before tailoring.
+Canadian AI hiring splits into three shapes that want visibly different resumes:
+**research-adjacent** (publications, methods, benchmarks), **ML/platform engineering** (pipelines,
+serving, latency, cost), and **product Python/backend** (APIs, data models, reliability). All three
+are in scope, so the fact bank is tagged for all three via a `shapes` field on each fact.
+
+**One shape per application, never three.** The obvious failure mode of covering all three is a
+resume that reads unfocused to every one of them. The pipeline resolves it mechanically rather than
+by compromise: a **shape classifier** runs on the JD during extraction and assigns it one primary
+shape, and the tailorer then selects facts weighted to *that* shape only. The breadth lives in the
+bank; every rendered resume is single-shaped. This is the main reason the fact bank and the
+renderer are separate stages.
+
+**Depth check, because breadth is only free if it is real.** At build time, count facts per shape.
+Any shape with too few strong facts to fill a resume gets a warning rather than silent thin output
+— better to learn that product-Python coverage is two bullets deep before a JD needs it than
+after. The per-shape gap report makes the same point per application.
 
 ## 10. Deliberately out of scope
 
