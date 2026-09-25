@@ -1,8 +1,8 @@
 # autoJobApply-Tracker
 
-A semi-automated job application system: discover roles, tailor a resume to each one,
-assist-fill the application form, and track every outcome — with email triage feeding
-status back in automatically.
+A semi-automated job application system for **Canadian AI, tech and Python roles**: discover
+roles, tailor a resume to each one, assist-fill the application form, and track every
+outcome — with email triage feeding status back in automatically.
 
 **Current state:** design phase. No code yet. Start with [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
 then [`docs/ROADMAP.md`](docs/ROADMAP.md) for the build order.

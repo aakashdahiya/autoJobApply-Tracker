@@ -6,8 +6,8 @@ Four parts of the original idea will fail in practice. Each has a better version
 
 | Original | Why it breaks | Do this instead |
 |---|---|---|
-| Fully automated, unattended applying | Bot-submitted applications get accounts banned on LinkedIn / Naukri / Indeed, and unreviewed answers to "why this company" are visibly generated. One bad batch poisons your name at 50 companies at once. | **Assisted apply.** The system fills every field, attaches the tailored resume, drafts the free-text answers, and highlights what it touched. You scan it and press submit. ~8 seconds per application instead of ~8 minutes, with none of the risk. |
-| Bot-scrape the job boards | LinkedIn actively detects and bans; Indeed and Naukri rate-limit and cloak. Selenium logins are the fastest route to a locked account. | **Three legitimate sources:** (a) the extension captures whatever you are already looking at, in your own logged-in session; (b) a nightly pull from free public ATS JSON endpoints (Greenhouse, Lever, Ashby, Workable, SmartRecruiters) for a watchlist of companies; (c) official feeds and APIs where they exist. |
+| Fully automated, unattended applying | Bot-submitted applications get accounts banned on LinkedIn / Indeed / Glassdoor, and unreviewed answers to "why this company" are visibly generated. One bad batch poisons your name at 50 companies at once. | **Assisted apply.** The system fills every field, attaches the tailored resume, drafts the free-text answers, and highlights what it touched. You scan it and press submit. ~8 seconds per application instead of ~8 minutes, with none of the risk. |
+| Bot-scrape the job boards | LinkedIn actively detects and bans; Indeed and Glassdoor rate-limit and cloak. Selenium logins are the fastest route to a locked account. | **Three legitimate sources:** (a) the extension captures whatever you are already looking at, in your own logged-in session; (b) a nightly pull from free public ATS JSON endpoints (Greenhouse, Lever, Ashby, Workable, SmartRecruiters) for a watchlist of companies; (c) official feeds and APIs where they exist. |
 | Google Docs holds the resume | You cannot control how a Docs export parses in an ATS, cannot diff two versions, cannot programmatically guarantee a single-column layout. Docs is a rendering target, not a data model. | **`profile.yaml` fact bank** → tailoring selects and orders facts → renderer emits an ATS-safe PDF and DOCX. A Google Doc copy is written *out* for human reading only. |
 | Google Sheets is the database | Three writers (extension, nightly worker, you) against a spreadsheet produces lost updates and duplicated rows. There is no transaction and no unique constraint. | **SQLite as source of truth** (Postgres when it outgrows one machine), with Sheets as a two-way-synced mirror. The worker pushes everything; only `Status` and `Notes` sync back from Sheets. |
 
@@ -71,7 +71,8 @@ resume_versions id, job_id, profile_revision, selected_fact_ids(json), pdf_path,
                docx_path, gdoc_url, keyword_coverage(json), created_at
 
 answers        id, question_norm, answer_text, scope(global|company|role), times_used
-               -- the reusable answer bank: notice period, visa, expected CTC, relocation…
+               -- the reusable answer bank: work authorisation, notice period,
+               --   expected base salary, relocation, referral source…
 
 events         id, application_id, kind, source, occurred_at, payload(json)
                -- every status change, email match, autofill run, and manual edit
@@ -83,7 +84,9 @@ email_links    id, gmail_message_id, gmail_thread_id, application_id, classifica
 **Dedupe key** — the same job appears on LinkedIn, the company site, and a job board.
 `dedupe_key = sha1(company_name_norm + "|" + title_norm + "|" + location_norm)`, where
 normalisation lowercases, strips punctuation, drops seniority noise (`Sr.` → `senior`), and
-canonicalises locations (`Bengaluru`/`Bangalore`/`BLR` → one token). A second `description_hash`
+canonicalises locations (`Toronto, ON`/`Greater Toronto Area`/`GTA` → one token;
+`Montréal`/`Montreal`/`MTL` → one token; `Remote - Canada`/`Remote (Canada)` → one token).
+A second `description_hash`
 catches reposts of the same listing under a new ID.
 
 **Application state machine:**
@@ -112,7 +115,14 @@ This is the part most such projects get wrong, so it is specified tightly.
 
 ```yaml
 identity:   { name: …, email: …, phone: …, links: {…} }
-constraints: { notice_period_days: 60, work_auth: …, expected_ctc: …, locations: [...] }
+constraints:
+  work_auth:        citizen | pr | work_permit | pgwp | needs_sponsorship
+  work_auth_expiry: 2027-04-30        # only if permit-based
+  provinces:        [ON, BC, remote-canada]
+  expected_base_cad: { min: 120000, target: 145000 }
+  notice_period_days: 30
+  french_level:     none | basic | working | fluent
+  relocate_within_canada: true
 
 facts:
   - id: f_pay_latency
@@ -148,8 +158,16 @@ is a legitimate source of resume content.
 
 ### Rendering
 
-One source, two outputs, because Indian portals (Naukri, Instahyre) and some ATSs want DOCX
-while everything else wants PDF.
+One source, two outputs. PDF is the default; DOCX matters more in the Canadian market than you
+might expect, because recruitment agencies and some enterprise Workday/Taleo instances still ask
+for it, and a few parse it more reliably than PDF.
+
+**Canadian resume conventions the renderer bakes in:** no photo, no date of birth, no marital
+status, and never a SIN — including these reads as unfamiliarity with the market and invites a
+human-rights-compliance problem for the employer. Location as `City, ON` style. Two pages is
+normal and accepted here, so the page budget is not one page. If you hold citizenship or PR,
+state it in one line near the top — it is a true fact about you and it removes the single most
+common screening doubt on a Canadian application.
 
 ATS-safe rules the renderer enforces: single column; no tables, text boxes, icons, or
 multi-column headers; contact details in the body, never in a page header; standard section
@@ -171,18 +189,30 @@ Build order by coverage-per-effort:
 1. **Greenhouse, Lever, Ashby** — stable DOM, single-page forms, standard file inputs. Covers
    most startup and mid-market roles. Start here.
 2. **Workable, SmartRecruiters, Zoho Recruit** — same shape, slightly messier.
-3. **Naukri / Instahyre / Foundit** — mostly profile-based rather than per-job forms; the win
-   here is keeping the hosted profile in sync, not filling a form.
-4. **Workday, Taleo, iCIMS** — multi-step, stateful, account-per-company. Real work. Defer until
-   the rest is solid, and treat "fill step 1 and 2, hand over" as a legitimate win.
+3. **Workday and Taleo** — multi-step, stateful, account-per-company. Real work, and normally
+   the thing to defer. **In Canada it is worth pulling forward**, because a large share of
+   senior Python and AI hiring sits behind it: the big five banks and their AI labs, the
+   telecoms, and the large insurers all run Workday or Taleo. Treat "fill steps 1 and 2, hand
+   over" as a legitimate win — the account-creation step alone is most of the friction.
+4. **iCIMS, BambooHR, Dayforce** — the long tail. Only worth it once you see the same one twice.
+5. **GC Jobs (jobs.gc.ca)** — the federal public service runs its own portal with a persistent
+   applicant profile, bilingual-requirement fields, and screening questions that must be
+   answered in prose. Profile-sync problem, not a form-fill problem. Lowest priority unless
+   you are targeting federal roles.
 
 **Mechanics:**
 - The panel holds the tailored resume ready to drag onto the form's file input, and can also
   set the `<input type=file>` directly via `DataTransfer` where the site allows it.
 - Field mapping is `label-regex → profile key`, with per-adapter overrides and a learning
   loop: when you correct a filled field, the correction is stored and reused.
-- The recurring dozen questions (notice period, expected CTC, visa, relocation, referral,
-  "how did you hear about us") come from the `answers` bank, not from a model.
+- The recurring dozen come from the `answers` bank, not from a model. In the Canadian market
+  that set is: are you legally entitled to work in Canada; status (citizen / PR / work permit,
+  and expiry); do you require sponsorship; province and willingness to relocate within Canada;
+  French proficiency; expected base salary in CAD; notice period; referral source; "how did you
+  hear about us".
+- **Never auto-fill voluntary self-identification** — employment-equity questions (Indigenous
+  identity, visible minority, disability, veteran status) and accommodation requests are left
+  blank for you to answer or skip yourself. The adapter marks them and moves on.
 - Genuinely novel free-text ("why this company") is drafted, then visibly marked as a draft.
   Anything the system wrote is outlined so you know what to actually read.
 - **It never clicks submit.** After you submit, the adapter detects the confirmation page or
@@ -243,7 +273,55 @@ anything needing a reply, and the orphan bucket. Plus immediate pushes for
 | Sheets/Docs/Gmail | Google API Python client, one OAuth consent | Sheets and Docs are views; Gmail read-only. |
 | Notifications | Telegram bot, or email to yourself | Telegram is the least friction for instant pings. |
 
-## 9. Deliberately out of scope
+## 9. Market profile: Canada (AI / tech / Python)
+
+The target market is Canadian AI, software and Python roles. That shapes four things.
+
+### Discovery sources, in priority order
+
+1. **Public ATS feeds for a Canadian company watchlist.** Greenhouse, Lever, Ashby, Workable and
+   SmartRecruiters each expose a free, documented JSON endpoint per company board. Build a
+   watchlist of Canadian tech and AI employers, detect each one's `ats_type` once, then poll
+   nightly. This is the highest-signal, lowest-risk source available and it costs nothing.
+   Seed the watchlist from the Toronto / Waterloo / Montreal / Vancouver ecosystems and the
+   AI-lab cluster around Vector, Mila and Amii.
+2. **Job Bank (jobbank.gc.ca).** The federal job board publishes machine-readable postings.
+   Verify the current feed format before building against it rather than trusting any
+   documentation from memory. Volume is high and tech-role signal is mixed, so it needs the
+   score gate more than the ATS feeds do.
+3. **The extension, on whatever you browse** — LinkedIn, Indeed Canada, Glassdoor, and the
+   ecosystem boards (Communitech, MaRS, Vector's job board, TechTO). Capture only; no crawling.
+4. **Company careers pages** for employers that run neither a known ATS nor a feed. Last resort,
+   one polite request a day.
+
+### Work authorisation is the dominant screening filter
+
+Nearly every Canadian application asks whether you are legally entitled to work in Canada, and a
+large fraction of postings state that they cannot sponsor. So `work_auth` is not just an answer to
+autofill — it is a **filter on discovery**:
+
+- If you are a citizen or PR, the filter is a no-op and you should state the status on the resume.
+- If you are on a PGWP or an employer-specific permit, postings that require authorisation
+  without sponsorship get scored down or skipped, and permit expiry feeds a warning when a
+  posting's start date sits close to it.
+- Never store a SIN anywhere in this system, and never let it be autofilled.
+
+### Compensation and language
+
+Salary expectations are in **CAD base**, and Canadian postings mix annual and hourly rates, so the
+`answers` bank stores both forms and the adapter picks by field type. Quebec roles and federal or
+federally-regulated postings may require French; `french_level` drives both a scoring adjustment
+and an honest answer rather than an optimistic one.
+
+### Role-shape notes for AI and Python work
+
+Canadian AI hiring splits into three shapes that want visibly different resumes, which is exactly
+what the tailoring pipeline is for: **research-adjacent** roles (publications, methods, benchmarks),
+**ML/platform engineering** (pipelines, serving, latency, cost), and **product Python/backend**
+(APIs, data models, reliability). Tag your `facts` so all three are well covered, and let the score
+gate tell you which shape a given JD actually is before tailoring.
+
+## 10. Deliberately out of scope
 
 Auto-submitting applications. Auto-replying to recruiters. Headless logins to job boards.
 Multi-user support. Anything that writes to Gmail. Each of these is either a ban risk, a

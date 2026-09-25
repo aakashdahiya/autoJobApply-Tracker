@@ -30,7 +30,8 @@ The minimum that beats a manual spreadsheet.
 
 - FastAPI service: `POST /jobs`, `GET /jobs`, `PATCH /applications/{id}`, SQLite + Alembic.
 - MV3 extension with a "Save this job" button and capture adapters for LinkedIn job pages,
-  Greenhouse, Lever, Ashby, and a generic fallback that grabs `<title>` + selected text.
+  Indeed Canada, Greenhouse, Lever, Ashby, and a generic fallback that grabs `<title>` +
+  selected text.
 - Dedupe on `dedupe_key`.
 - Sheets mirror: worker pushes all rows; `Status` and `Notes` sync back.
 
@@ -45,6 +46,7 @@ The phase that actually saves the time.
 
 - Side-panel job queue: filter, sort, open apply URL.
 - Autofill adapters for Greenhouse, Lever, Ashby.
+- Leave voluntary self-identification and accommodation fields untouched; mark and skip them.
 - `answers` bank for the recurring dozen questions, editable from the panel.
 - Resume attach: drag-and-drop from the panel plus direct file-input set where allowed.
 - Highlight every field the system touched; store each value in `events`.
@@ -54,12 +56,18 @@ The phase that actually saves the time.
 **Done when:** a Greenhouse application goes from panel to submitted in under 30 seconds and
 the status flips to `applied` by itself.
 
+**Canada note:** if your target list leans toward banks, telecoms and insurers, a Workday adapter
+earns its keep immediately rather than in Phase 6 — that is where much of the senior Python and
+AI hiring sits. Partial fill (steps 1–2, then hand over) is a real win there.
+
 ---
 
 ## Phase 3 — Scoring and tailoring (~1 week)
 
 - JD extraction into a Pydantic schema, cached on `description_hash`.
 - Match scoring; threshold gate; skip reasons recorded.
+- Work-authorisation filter: postings that cannot sponsor are scored down or skipped when
+  `work_auth` calls for it, and permit expiry raises a flag against distant start dates.
 - Constrained tailoring (select → rephrase → validate) per §4 of the architecture.
 - The `fact_id` traceability validator, with tests for the failure cases: invented bullet,
   invented number, skill not in profile.
@@ -88,10 +96,13 @@ assessment email reaches your phone within the hour.
 
 ## Phase 5 — Discovery (~1 week)
 
-- Company watchlist with detected `ats_type`.
+- Canadian company watchlist with detected `ats_type`, seeded from the Toronto, Waterloo,
+  Montreal and Vancouver tech and AI ecosystems.
 - Nightly pull from public ATS JSON endpoints (Greenhouse, Lever, Ashby, Workable,
   SmartRecruiters) — these are free, documented, and pleasant to consume.
-- Feed-based sources for remote roles.
+- Job Bank (jobbank.gc.ca) postings feed — confirm the current feed format before building
+  against it. High volume, mixed tech signal, so it leans hard on the score gate.
+- Feed-based sources for Canada-remote roles.
 - Upsert on `dedupe_key`; score everything; queue the top N for tailoring.
 - Digest section: "new, scored above threshold, tailored and ready."
 
@@ -101,8 +112,9 @@ assessment email reaches your phone within the hour.
 
 ## Phase 6 — Hardening, once it is in daily use
 
-- Workday / Taleo / iCIMS adapters, partial-fill accepted as a win.
-- Naukri / Instahyre hosted-profile sync.
+- Workday / Taleo adapters if not already pulled forward; partial-fill accepted as a win.
+- iCIMS, BambooHR, Dayforce — the long tail, once you meet the same one twice.
+- GC Jobs profile sync, only if federal roles are in scope.
 - Field-mapping learning loop from your corrections.
 - Response-rate analytics: which resume variants, seniority levels and sources convert. This is
   the part that eventually makes you better at applying, not just faster.
@@ -110,14 +122,23 @@ assessment email reaches your phone within the hour.
 
 ---
 
-## Open questions to settle before Phase 1
+## Decisions settled
 
-1. **Geography and boards.** Indian portals (Naukri, Instahyre, Cutshort, Hirist) need
-   different adapters from US/EU ATSs, and the hosted-profile model differs from per-job
-   forms. Which matters most to you first?
-2. **Where the backend runs.** Localhost only (simplest, works when your laptop is on) versus a
-   small always-on VPS (cron actually fires nightly, costs a few dollars a month).
-3. **Resume format demanded most often** by your target roles — PDF only, or is DOCX a
-   frequent requirement?
-4. **Python for the backend** as recommended, or TypeScript end-to-end to keep one language
-   across extension and server?
+- **Market:** Canadian AI, tech and Python roles. Adapter and discovery priorities follow
+  §9 of the architecture; Workday matters more here than in a startup-only market.
+- **Backend:** Python + FastAPI, bound to `127.0.0.1`.
+- **Hosting:** localhost through Phase 3. Move to a small always-on VPS at Phase 4, when
+  scheduled Gmail triage and nightly discovery need to run whether or not the laptop is awake.
+  Add API auth as part of that move, not after it.
+
+## Still open
+
+1. **Work authorisation status** — citizen, PR, PGWP, or needs sponsorship. This is not a
+   detail: it drives the discovery filter, the scoring adjustment, and whether the resume
+   should state status near the top.
+2. **Province and remote appetite** — which provinces count as local, and whether
+   Canada-remote-only postings are in or out.
+3. **Role shape weighting** — research-adjacent ML, ML/platform engineering, or product
+   Python. Most people want two of the three; the third is a distraction worth filtering out.
+4. **French proficiency**, which decides whether Quebec and federally-regulated postings are
+   worth scoring at all.
