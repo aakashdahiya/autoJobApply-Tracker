@@ -26,20 +26,27 @@ cp profile.example.yaml profile.yaml      # then replace every value with your o
 
 # Render one shape, ATS-safe, PDF + DOCX
 .venv/bin/python -m resume.render --profile profile.yaml \
-    --shape ml_platform --out out/resume.pdf --docx out/resume.docx
+    --shape ai_engineer --out out/resume.pdf --docx out/resume.docx
+
+# Maximum parser safety: dates inline instead of at the right margin
+.venv/bin/python -m resume.render --profile profile.yaml \
+    --shape ai_engineer --out out/resume.pdf --date-style inline
 
 .venv/bin/python -m pytest
 ```
 
-Shapes are `research`, `ml_platform`, and `product_python`. All three live in the fact bank;
-each rendered resume targets exactly one.
+Shapes are `ai_engineer`, `backend_python` and `fullstack`. All three live in the fact bank;
+each rendered resume targets exactly one, with its own headline and summary.
 
 The command exits non-zero and writes nothing usable if any bullet fails to trace back to a
 fact, if a number appears that its source fact does not contain, if a skill reaches the page
 unsupported by a selected bullet, or if the text extracted back out of the finished PDF does
-not match what was rendered. That last check is not theoretical: it caught a layout where
-right-aligned employment dates were extracted *in the middle of the first bullet*, which looks
-perfect on screen and reads as mangled prose to an ATS.
+not match what was rendered. That last check is not theoretical: right-aligned employment dates
+are extracted *in the middle of the first bullet* by two of three tested extraction heuristics,
+so a bullet can reach an employer as "…with an online quote wizard and photo **Mar 2026 –
+Present** uploads." The layout is kept because it is the established format and a layout-aware
+parser reads it correctly; `--date-style inline` removes the risk for anyone who would rather
+not take it.
 
 ## Design principles
 

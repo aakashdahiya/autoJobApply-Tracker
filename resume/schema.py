@@ -1,8 +1,12 @@
 """Schema for `profile.yaml` — the fact bank every resume is built from.
 
+Modelled on the source resume's own structure: a headline that changes with the
+role, an experience section whose entries carry their own tech line, a projects
+section that is first-class rather than an afterthought, and skills grouped the
+way a reader expects to see them.
+
 Nothing may reach a rendered resume that does not trace back to a `Fact` here.
-`Profile` enforces the structural half of that (facts reference real roles,
-fact skills are declared up front); `verify.py` enforces the rest at render
+`Profile` enforces the structural half; `verify.py` enforces the rest at render
 time.
 """
 
@@ -14,19 +18,23 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-YYYY_MM = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+from resume.markup import strip_markup
+
+YYYY_MM = r"^\d{4}-(0[1-9]|1[0-2])$"
+YEAR_OR_MONTH = r"^\d{4}(-(0[1-9]|1[0-2]))?$"
 
 
 class Shape(str, Enum):
-    """The three role shapes Canadian AI/Python hiring splits into.
+    """The role shapes this history genuinely supports.
 
-    One shape per rendered resume, never three — see docs/ARCHITECTURE.md
-    section 9. Breadth lives in the fact bank; focus lives in the render.
+    Derived from the source resume rather than a generic taxonomy: the work is
+    LLM product engineering, the Python service layer underneath it, and the
+    Next.js/Supabase product surface around it. One shape per rendered resume.
     """
 
-    research = "research"
-    ml_platform = "ml_platform"
-    product_python = "product_python"
+    ai_engineer = "ai_engineer"
+    backend_python = "backend_python"
+    fullstack = "fullstack"
 
 
 class PermitType(str, Enum):
@@ -44,41 +52,23 @@ class Model(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class Money(Model):
-    min: int
-    target: int
-
-    @model_validator(mode="after")
-    def _ordered(self) -> Money:
-        if self.target < self.min:
-            raise ValueError("expected_base_cad.target must be >= min")
-        return self
-
-
 class Identity(Model):
     name: str
     email: str
     phone: str
     city: str
     province: str = Field(pattern=r"^(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)$")
-    links: dict[str, str] = Field(default_factory=dict)
+    area: str | None = None  # e.g. "Toronto Area" — what a recruiter searches for
+    links: list[str] = Field(default_factory=list)
 
     @property
     def location(self) -> str:
-        """Canadian convention: `City, PROV` — never a full address."""
-        return f"{self.city}, {self.province}"
+        base = f"{self.city}, {self.province}"
+        return f"{base} ({self.area})" if self.area else base
 
 
 class Constraints(Model):
-    """Answers that stay constant across applications, plus the derived ones.
-
-    `requires_sponsorship` is deliberately a property rather than a stored
-    field. On an employer-specific permit, changing employers needs a new
-    permit and often an LMIA, which is functionally what employers mean by
-    sponsorship; answering "no" there surfaces at the offer stage. Deriving it
-    from `permit_type` makes that impossible to get wrong by editing one line
-    of YAML.
-    """
+    """Answers that stay constant across applications, plus the derived ones."""
 
     work_auth: str = "work_permit"
     permit_type: PermitType
@@ -89,37 +79,38 @@ class Constraints(Model):
     provinces: list[str] = Field(default_factory=lambda: ["canada-wide"])
     work_modes: list[str] = Field(default_factory=lambda: ["remote", "hybrid", "onsite"])
     relocate_within_canada: bool = True
-    expected_base_cad: Money | None = None
-    notice_period_days: int = Field(default=0, ge=0)
+    expected_base_cad: str | None = None
+    notice_period_days: int | None = None
     french_level: str = "none"
 
     @property
     def requires_sponsorship(self) -> bool:
+        """Only an employer-specific permit needs a new one to change employer.
+
+        Derived rather than stored so it cannot drift out of sync with reality
+        by editing one line of YAML — answering this wrong surfaces at the offer
+        stage, which is the worst possible moment.
+        """
         return self.permit_type is PermitType.employer_specific
 
     @property
     def show_work_auth_line(self) -> bool:
-        """An open permit is worth stating; a closed one invites a screen-out."""
         return self.permit_type is PermitType.open
 
     def work_auth_line(self) -> str | None:
         if not self.show_work_auth_line:
             return None
         line = "Authorised to work in Canada"
-        if self.permit_subtype:
-            line += f" ({self.permit_subtype.upper()}"
-            if self.work_auth_expiry:
-                line += f", valid to {self.work_auth_expiry:%b %Y}"
-            line += ")"
-        elif self.work_auth_expiry:
-            line += f" (open work permit, valid to {self.work_auth_expiry:%b %Y})"
-        return line
+        detail = self.permit_subtype.upper() if self.permit_subtype else "open work permit"
+        if self.work_auth_expiry:
+            return f"{line} ({detail}, valid to {self.work_auth_expiry:%b %Y})"
+        return f"{line} ({detail})"
 
 
 class SelfId(Model):
     """Voluntary employment-equity answers, stored canonically.
 
-    Adapters map these to each ATS's own option strings — Canadian
+    Adapters map these to each ATS's own option strings; Canadian
     employment-equity wording and US EEO-1 wording are not interchangeable.
     Nothing here is ever inferred from the rest of the profile.
     """
@@ -141,87 +132,107 @@ class SelfId(Model):
         return v
 
 
+def _fmt(ym: str) -> str:
+    if len(ym) == 4:
+        return ym
+    return dt.datetime.strptime(ym, "%Y-%m").strftime("%b %Y")
+
+
 class Role(Model):
     id: str
     title: str
     company: str
     location: str
-    start: str = Field(pattern=YYYY_MM.pattern)
-    end: str | None = None  # None means present
+    start: str = Field(pattern=YYYY_MM)
+    end: str | None = None
+    tech: list[str] = Field(default_factory=list)
 
     @field_validator("end")
     @classmethod
     def _end_format(cls, v: str | None) -> str | None:
-        if v is not None and not YYYY_MM.match(v):
-            raise ValueError("end must be YYYY-MM or omitted for present")
+        if v is not None and not re.match(YYYY_MM, v):
+            raise ValueError("end must be YYYY-MM, or omitted for present")
         return v
 
     def date_range(self) -> str:
-        def fmt(ym: str) -> str:
-            return dt.datetime.strptime(ym, "%Y-%m").strftime("%b %Y")
+        return f"{_fmt(self.start)} – {_fmt(self.end) if self.end else 'Present'}"
 
-        return f"{fmt(self.start)} – {fmt(self.end) if self.end else 'Present'}"
+
+class Project(Model):
+    """First-class, because for an early-career profile projects carry real weight."""
+
+    id: str
+    name: str
+    tagline: str | None = None
+    tech: list[str] = Field(default_factory=list)
+    link: str | None = None
 
 
 class Education(Model):
-    institution: str
     credential: str
+    institution: str
     location: str
-    end: str = Field(pattern=YYYY_MM.pattern)
+    end: str = Field(pattern=YEAR_OR_MONTH)
     start: str | None = None
     note: str | None = None
 
     def date_range(self) -> str:
-        def fmt(ym: str) -> str:
-            return dt.datetime.strptime(ym, "%Y-%m").strftime("%b %Y")
-
-        return f"{fmt(self.start)} – {fmt(self.end)}" if self.start else fmt(self.end)
+        return f"{_fmt(self.start)} – {_fmt(self.end)}" if self.start else _fmt(self.end)
 
 
 class Fact(Model):
-    """One true thing you did, tagged for retrieval. The only legitimate source
-    of resume content."""
+    """One true thing you did. The only legitimate source of resume content.
+
+    `bullet` may use `**bold**`; every check runs on the stripped text.
+    """
 
     id: str = Field(pattern=r"^f_[a-z0-9_]+$")
-    role: str
+    role: str | None = None
+    project: str | None = None
     bullet: str = Field(min_length=10)
     shapes: list[Shape] = Field(min_length=1)
     skills: list[str] = Field(default_factory=list)
-    metrics: list[str] = Field(default_factory=list)
-    aliases: dict[str, list[str]] = Field(default_factory=dict)
     strength: int = Field(ge=1, le=5)
+
+    @property
+    def plain(self) -> str:
+        return strip_markup(self.bullet)
+
+    @property
+    def anchor(self) -> str:
+        """The role or project this bullet belongs under."""
+        return self.role or self.project  # type: ignore[return-value]
+
+    @model_validator(mode="after")
+    def _one_anchor(self) -> Fact:
+        if bool(self.role) == bool(self.project):
+            raise ValueError(f"fact {self.id} must set exactly one of `role` or `project`")
+        return self
 
 
 class Profile(Model):
     identity: Identity
     constraints: Constraints
     self_id: SelfId = Field(default_factory=SelfId)
+    headline: dict[Shape, str]
+    summary: dict[Shape, str] = Field(default_factory=dict)
     skills: dict[str, list[str]]
-    skill_labels: dict[str, str] = Field(default_factory=dict)
-    experience: list[Role] = Field(min_length=1)
+    experience: list[Role] = Field(default_factory=list)
+    projects: list[Project] = Field(default_factory=list)
     education: list[Education] = Field(default_factory=list)
     facts: list[Fact] = Field(min_length=1)
-    summary: dict[Shape, str] = Field(default_factory=dict)
-
-    @property
-    def declared_skills(self) -> set[str]:
-        return {s for group in self.skills.values() for s in group}
-
-    def label(self, skill: str) -> str:
-        """How a skill is written for humans.
-
-        Skills are stored canonically and lowercased so that matching against a
-        job description stays boring and reliable. Nobody wants `ci-cd` on their
-        resume, though, so display is a separate concern: the canonical token is
-        what gets verified, the label is only what gets printed.
-        """
-        return self.skill_labels.get(skill, skill)
 
     def role(self, role_id: str) -> Role:
         for r in self.experience:
             if r.id == role_id:
                 return r
         raise KeyError(role_id)
+
+    def project(self, project_id: str) -> Project:
+        for p in self.projects:
+            if p.id == project_id:
+                return p
+        raise KeyError(project_id)
 
     @model_validator(mode="after")
     def _cross_references(self) -> Profile:
@@ -234,26 +245,23 @@ class Profile(Model):
             seen.add(f.id)
 
         role_ids = {r.id for r in self.experience}
+        project_ids = {p.id for p in self.projects}
         if len(role_ids) != len(self.experience):
             problems.append("duplicate role ids in experience")
+        if len(project_ids) != len(self.projects):
+            problems.append("duplicate project ids")
+        if role_ids & project_ids:
+            problems.append(f"ids shared between roles and projects: {sorted(role_ids & project_ids)}")
 
         for f in self.facts:
-            if f.role not in role_ids:
+            if f.role and f.role not in role_ids:
                 problems.append(f"fact {f.id} references unknown role {f.role!r}")
+            if f.project and f.project not in project_ids:
+                problems.append(f"fact {f.id} references unknown project {f.project!r}")
 
-        # Every skill a fact claims must be declared up front. This is what stops
-        # a keyword drifting onto the resume via a bullet's tags.
-        declared = self.declared_skills
-        for f in self.facts:
-            for s in f.skills:
-                if s not in declared:
-                    problems.append(
-                        f"fact {f.id} claims skill {s!r}, which is not declared in `skills`"
-                    )
-
-        for s in self.skill_labels:
-            if s not in declared:
-                problems.append(f"skill_labels has {s!r}, which is not declared in `skills`")
+        for shape in Shape:
+            if shape not in self.headline:
+                problems.append(f"no headline for shape {shape.value!r}")
 
         if problems:
             raise ValueError("; ".join(problems))

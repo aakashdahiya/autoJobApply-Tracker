@@ -166,17 +166,26 @@ assessment email reaches your phone within the hour.
 - **Self-identification:** disclose where asked — man, not Indigenous, racialized (South Asian),
   no disability, not a veteran. Stored canonically and mapped per ATS; never inferred from
   anything else in the profile.
-- **Role shapes:** all three in the fact bank, but **one shape per application**, chosen by a JD
-  classifier. Breadth in the bank, focus on every rendered resume.
+- **Role shapes:** `ai_engineer`, `backend_python`, `fullstack` — revised from the generic
+  taxonomy to match the real history. All three in the fact bank, **one shape per application**,
+  chosen by a JD classifier. Breadth in the bank, focus on every rendered resume.
+- **Resume format:** reproduces the existing resume rather than replacing it. Right-aligned dates
+  stay the default, with `--date-style inline` available for maximum parser safety.
+- **Compensation and notice:** flexible; no salary filter on discovery, and the answer bank says
+  so rather than naming a number that could anchor low.
 - **French:** assumed `none` until told otherwise — French-required Quebec and federally
   regulated postings are scored down, while Montreal's English-language AI roles stay in scope.
 
 ## Still open
 
-Nothing blocking. What is needed next is content rather than decisions:
+Nothing blocking Phase 1.
 
-1. **Your actual career facts**, to fill the Phase 0 `profile.yaml` template. The system cannot
-   invent these by design — the traceability validator exists precisely to stop it.
-2. **Target compensation** in CAD, and your notice period if you are currently employed.
-3. **The Workday tenants you care about**, to seed the company watchlist. Even ten names is
-   enough to start.
+1. **Work permit expiry date**, to fill `constraints.work_auth_expiry`. Currently null, so the
+   resume line reads "(PGWP)" without a date.
+2. **The Workday employers you care about**, to seed the company watchlist. Ten names is enough
+   to start detecting tenants against.
+3. **Whether `profile.yaml` should be committed.** It is gitignored today because it holds
+   personal data; committing it to a private repository would make the fact bank survive a fresh
+   checkout.
+4. **Fact bank depth for `ai_engineer`** — four bullets support the shape you most want to be
+   hired for. Another shipped AI project is the fix the depth check is asking for.

@@ -193,8 +193,14 @@ One source, two outputs. PDF is the default; DOCX matters more in the Canadian m
 might expect, because recruitment agencies and some enterprise Workday/Taleo instances still ask
 for it, and a few parse it more reliably than PDF.
 
-**Canadian resume conventions the renderer bakes in:** no photo, no date of birth, no marital
-status, and never a SIN — including these reads as unfamiliarity with the market and invites a
+**The renderer reproduces the existing resume's format**, since that format is already good:
+Calibri 10pt, 0.5in/0.6in margins, a 17pt name, 11pt bold section headings over a hairline rule, a
+per-role `Tech:` line, right-aligned dates, and Projects as a first-class section. Bullets may bold
+a phrase with `**markup**`; every content check runs on the stripped text, so markup can never
+carry a claim past a validator.
+
+**Canadian conventions it also enforces:** no photo, no date of birth, no marital status, and
+never a SIN — including these reads as unfamiliarity with the market and creates a
 human-rights-compliance problem for the employer. Location as `City, ON` style. Two pages is
 normal and accepted here, so the page budget is not one page.
 
@@ -207,10 +213,18 @@ the renderer as well as the answer bank.
 
 ATS-safe rules the renderer enforces: single column; no tables, text boxes, icons, or
 multi-column headers; contact details in the body, never in a page header; standard section
-names (`Experience`, `Education`, `Skills`, `Projects`); a real text layer with embedded
-standard fonts; no images. Verify by running the generated PDF back through a text extractor
-and asserting the extracted text matches what you rendered — a one-line test that catches
-most parsing disasters.
+names; a real text layer with embedded standard fonts; no images; hyphenation off so extracted
+text matches the source exactly. The generated PDF is run back through a text extractor and the
+result checked against what was rendered.
+
+**One finding worth recording.** Right-aligned dates — the tab-stop style the source resume uses,
+and the style most resumes use — are positioned correctly in the PDF, but two of three tested
+extraction heuristics group the date into the *following* paragraph, so a bullet arrives at the
+employer as "…with an online quote wizard and photo **Mar 2026 – Present** uploads." Strict
+position-order extraction reads it correctly, so a layout-aware parser is fine and a naive one is
+not. It is a coin flip taken for free. The renderer therefore keeps the right-aligned style by
+default and offers `--date-style inline`, which removes the ambiguity entirely; a test asserts the
+inline variant carries no such risk, and an advisory prints whenever the default one does.
 
 File naming: `Aakash_Dahiya_{Company}_{Role}.pdf`, with the version row keeping the mapping.
 
@@ -439,10 +453,15 @@ and an honest answer rather than an optimistic one.
 
 ### Role-shape notes for AI and Python work
 
-Canadian AI hiring splits into three shapes that want visibly different resumes:
-**research-adjacent** (publications, methods, benchmarks), **ML/platform engineering** (pipelines,
-serving, latency, cost), and **product Python/backend** (APIs, data models, reliability). All three
-are in scope, so the fact bank is tagged for all three via a `shapes` field on each fact.
+The shapes were revised once the real resume was in hand, because the generic taxonomy did not
+fit the history. There are no publications and no large-scale serving platform, so tagging facts
+for a "research" or "ML platform" shape would have meant inventing evidence. The three shapes the
+history genuinely supports are **ai_engineer** (LLM products, RAG, vision, embeddings),
+**backend_python** (FastAPI services, data modelling, the layer underneath), and **fullstack**
+(Next.js/Supabase product surfaces shipped end to end). Each fact carries a `shapes` field.
+
+This is the general rule, not a one-off: the taxonomy follows the fact bank. A shape nothing can
+be tagged for is a shape you cannot apply to honestly.
 
 **One shape per application, never three.** The obvious failure mode of covering all three is a
 resume that reads unfocused to every one of them. The pipeline resolves it mechanically rather than
@@ -452,9 +471,10 @@ bank; every rendered resume is single-shaped. This is the main reason the fact b
 renderer are separate stages.
 
 **Depth check, because breadth is only free if it is real.** At build time, count facts per shape.
-Any shape with too few strong facts to fill a resume gets a warning rather than silent thin output
-— better to learn that product-Python coverage is two bullets deep before a JD needs it than
-after. The per-shape gap report makes the same point per application.
+Any shape too thin to fill a resume gets a warning rather than silent thin output. On the current
+fact bank that check earns its keep immediately: `fullstack` is well covered, while `ai_engineer`
+rests on four bullets — which matters, because the AI roles are the target. The honest fix is
+another shipped AI project, not a lower threshold.
 
 ## 10. Deliberately out of scope
 

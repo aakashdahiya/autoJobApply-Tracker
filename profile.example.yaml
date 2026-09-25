@@ -1,39 +1,39 @@
-# EXAMPLE fact bank — every value here is placeholder. Copy to profile.yaml and
-# replace with your own history. profile.yaml is gitignored because it holds
+# EXAMPLE fact bank — every value is placeholder. Copy to profile.yaml and
+# replace with your own history; profile.yaml is gitignored because it holds
 # personal data.
 #
 # The rule this file exists to enforce: nothing reaches a rendered resume that
 # is not a `fact` below. Tailoring reorders and re-weights these; it never adds.
-# Tag each fact with the role shapes it genuinely supports — one shape is
-# chosen per application, so breadth here costs nothing.
+# `**bold**` inside a bullet renders bold, and every check runs on the stripped
+# text so markup cannot smuggle a claim past a validator.
 
 identity:
   name: Your Name
   email: you@example.com
   phone: "+1 647 555 0123"
-  city: Toronto
+  city: Ajax
   province: ON
+  area: Toronto Area
   links:
-    linkedin: linkedin.com/in/yourname
-    github: github.com/yourname
+    - yourname.com
+    - linkedin.com/in/yourname
+    - github.com/yourname
 
 constraints:
   work_auth: work_permit
   permit_type: open          # PGWP is an open permit; derives the sponsorship answer
   permit_subtype: pgwp
-  work_auth_expiry: 2027-12-31
+  work_auth_expiry: 2028-06-30
   citizenship: India
-  credential_assessment: null   # WES ECA reference, if you hold one
+  credential_assessment: null
   provinces: [canada-wide]
   work_modes: [remote, hybrid, onsite]
   relocate_within_canada: true
-  expected_base_cad:
-    min: 120000
-    target: 145000
-  notice_period_days: 30
+  expected_base_cad: "flexible / open to market rate"
+  notice_period_days: 0
   french_level: none
 
-self_id:                     # voluntary; quoted for clarity (the loader keeps them strings)
+self_id:                     # voluntary; quoted for clarity
   mode: disclose
   gender: man
   indigenous: "no"
@@ -42,237 +42,132 @@ self_id:                     # voluntary; quoted for clarity (the loader keeps t
   disability: "no"
   veteran: "no"
 
-skills:
-  Languages: [python, sql, go, typescript]
-  Machine learning: [pytorch, scikit-learn, mlflow, transformers, model-evaluation]
-  Data and infrastructure:
-    [postgresql, redis, kafka, airflow, spark, docker, kubernetes, terraform, aws]
-  Practices: [ci-cd, observability, ab-testing]
-
-# How skills are printed. Stored canonically and lowercased so keyword matching
-# against a job description stays reliable; only the label reaches the page.
-skill_labels:
-  python: Python
-  sql: SQL
-  go: Go
-  typescript: TypeScript
-  pytorch: PyTorch
-  scikit-learn: scikit-learn
-  mlflow: MLflow
-  transformers: Transformers
-  model-evaluation: model evaluation
-  postgresql: PostgreSQL
-  redis: Redis
-  kafka: Kafka
-  airflow: Airflow
-  spark: Spark
-  docker: Docker
-  kubernetes: Kubernetes
-  terraform: Terraform
-  aws: AWS
-  ci-cd: CI/CD
-  observability: observability
-  ab-testing: A/B testing
-
-experience:
-  - id: r_ml
-    title: ML Platform Engineer
-    company: Northwind Analytics
-    location: Toronto, ON
-    start: 2024-01
-  - id: r_backend
-    title: Senior Backend Engineer
-    company: Meridian Software
-    location: Pune, India
-    start: 2021-01
-    end: 2022-07
-  - id: r_data
-    title: Data Engineer
-    company: Kestrel Labs
-    location: Pune, India
-    start: 2018-07
-    end: 2020-12
-
-education:
-  - credential: MEng, Computer Engineering
-    institution: University of Waterloo
-    location: Waterloo, ON
-    start: 2022-09
-    end: 2023-12
-  - credential: BE, Computer Science
-    institution: Savitribai Phule Pune University
-    location: Pune, India
-    end: 2018-05
+# The line under the name. Changes with the role being applied for.
+headline:
+  ai_engineer: Python & AI Engineer
+  backend_python: Python & Backend Engineer
+  fullstack: Full-Stack Engineer (Next.js + Python)
 
 summary:
-  ml_platform: >-
-    ML platform engineer with six years across data and backend systems, focused on
-    getting models served reliably and cheaply in production.
-  product_python: >-
-    Backend engineer with six years in Python and SQL, building APIs and data models
-    that stay correct under load.
-  research: >-
-    Engineer with six years in production ML and data systems, working on evaluation
-    and model quality alongside the platform that serves them.
+  ai_engineer: >-
+    AI engineer who builds and ships LLM-powered products end to end: retrieval-augmented
+    generation, vision pipelines, and the Python services around them.
+  backend_python: >-
+    Python engineer building the FastAPI services and data layer behind LLM-powered
+    products.
+  fullstack: >-
+    Full-stack engineer who ships end to end, from the product surface to the Python
+    services behind it.
+
+skills:
+  Languages: [Python, JavaScript, SQL, HTML/CSS]
+  AI / ML: [LLM APIs, RAG, embeddings, semantic search, prompt engineering]
+  Backend & Data: [FastAPI, SQLAlchemy, SQLite, REST APIs]
+  Frontend: [Next.js, React]
+  Tools: [Git/GitHub]
+
+experience:
+  - id: r_example
+    title: Software Developer
+    company: Example Co
+    location: Toronto, ON
+    start: 2024-06
+    tech: [Next.js, React, Postgres, REST APIs]
+
+projects:
+  - id: p_example
+    name: ExampleProject
+    tagline: RAG Q&A over your own documents
+    tech: [Python, FastAPI, sentence-transformers]
+    link: github.com/yourname/exampleproject
+
+education:
+  - credential: MSc, Computer Science
+    institution: Example University
+    location: Thunder Bay, ON
+    end: "2024"
+    note: "Relevant coursework: Pattern Recognition"
+  - credential: Bachelor of Computer Applications (BCA)
+    institution: Example Institute
+    location: New Delhi
+    end: "2022"
 
 facts:
-  - id: f_serving_latency
-    role: r_ml
+  - id: f_conversion
+    role: r_example
     bullet: >-
-      Cut p99 inference latency from 840ms to 190ms by batching requests at the
-      serving layer and moving feature lookups to a Redis read-through cache.
-    shapes: [ml_platform, product_python]
-    skills: [python, redis, observability]
-    metrics: [latency, p99]
-    aliases: {caching: [redis, read-through cache]}
+      Increased lead conversion by **35%** by replacing a manual, call-based quoting
+      process with an online quote wizard.
+    shapes: [fullstack]
+    skills: [nextjs, product]
     strength: 5
 
-  - id: f_feature_store
-    role: r_ml
+  - id: f_web_app
+    role: r_example
     bullet: >-
-      Built a feature pipeline in Airflow and Spark serving 40 models, replacing six
-      hand-maintained cron jobs and removing a recurring class of training-serving skew.
-    shapes: [ml_platform]
-    skills: [airflow, spark, python]
-    metrics: [models, skew]
-    strength: 5
-
-  - id: f_model_registry
-    role: r_ml
-    bullet: >-
-      Introduced MLflow tracking and a promotion gate, so every deployed model carries
-      its training data version, metrics and rollback target.
-    shapes: [ml_platform, research]
-    skills: [mlflow, model-evaluation, ci-cd]
-    metrics: [reproducibility]
+      Built a lead-generation web app (**Next.js, Postgres**) that gives customers instant
+      quotes.
+    shapes: [fullstack]
+    skills: [nextjs, postgres]
     strength: 4
 
-  - id: f_eval_harness
-    role: r_ml
+  - id: f_vision_listing
+    role: r_example
     bullet: >-
-      Wrote the offline evaluation harness the team now gates releases on, covering
-      slice metrics and a regression suite over 12 held-out cohorts.
-    shapes: [research, ml_platform]
-    skills: [python, model-evaluation, scikit-learn]
-    metrics: [slice metrics, regression]
+      Built an AI listing generator that turns item photos into product titles and
+      descriptions using a vision model.
+    shapes: [ai_engineer, fullstack]
+    skills: [llm, vision]
     strength: 5
 
-  - id: f_ab_testing
-    role: r_ml
+  - id: f_shared_backend
+    role: r_example
     bullet: >-
-      Ran the A/B programme for ranking changes, including the sequential test that
-      stopped a launch showing a 3% drop in downstream conversion.
-    shapes: [research, product_python]
-    skills: [ab-testing, python, sql]
-    metrics: [conversion]
+      Connected two apps through a shared Postgres backend with a one-click publish flow.
+    shapes: [fullstack, backend_python]
+    skills: [postgres, data-modelling]
     strength: 4
 
-  - id: f_gpu_cost
-    role: r_ml
+  - id: f_attribution
+    role: r_example
     bullet: >-
-      Reduced GPU spend 38% by right-sizing inference instances and moving batch
-      scoring to spot capacity with checkpointed restarts.
-    shapes: [ml_platform]
-    skills: [aws, terraform, kubernetes]
-    metrics: [cost, gpu]
+      Built keyword-level lead attribution so the admin dashboard shows the search term
+      behind each enquiry.
+    shapes: [fullstack, backend_python]
+    skills: [analytics, rest-apis]
     strength: 4
 
-  - id: f_transformer_finetune
-    role: r_ml
+  - id: f_checkout
+    role: r_example
     bullet: >-
-      Fine-tuned a transformer classifier for document routing, reaching 94% macro-F1
-      against a 78% baseline and shipping it behind a confidence threshold.
-    shapes: [research, ml_platform]
-    skills: [pytorch, transformers, model-evaluation]
-    metrics: [macro-f1, baseline]
-    strength: 5
-
-  - id: f_api_platform
-    role: r_backend
-    bullet: >-
-      Led the split of a Django monolith into four Python services behind a shared
-      gateway, keeping the public API stable through the migration.
-    shapes: [product_python, ml_platform]
-    skills: [python, docker, postgresql]
-    metrics: [services]
-    strength: 5
-
-  - id: f_query_tuning
-    role: r_backend
-    bullet: >-
-      Removed an N+1 read pattern and added covering indexes, taking the slowest
-      reporting endpoint from 11s to 700ms at the 95th percentile.
-    shapes: [product_python, ml_platform]
-    skills: [postgresql, sql, python]
-    metrics: [latency, p95]
-    strength: 5
-
-  - id: f_event_pipeline
-    role: r_backend
-    bullet: >-
-      Replaced nightly batch syncs with Kafka consumers, cutting data staleness from
-      18 hours to under 2 minutes for downstream consumers.
-    shapes: [product_python, ml_platform, research]
-    skills: [kafka, python, postgresql]
-    metrics: [staleness]
-    strength: 4
-
-  - id: f_oncall
-    role: r_backend
-    bullet: >-
-      Set up structured logging, tracing and alerting, reducing mean time to diagnose
-      production incidents from 45 minutes to 12.
-    shapes: [product_python, ml_platform]
-    skills: [observability, python, docker]
-    metrics: [mttd]
-    strength: 4
-
-  - id: f_typed_api
-    role: r_backend
-    bullet: >-
-      Moved request and response validation to typed schemas, eliminating a class of
-      serialisation bug that had caused three of the prior quarter's incidents.
-    shapes: [product_python]
-    skills: [python, typescript, ci-cd]
-    metrics: [incidents]
+      Implemented checkout with order confirmations and an admin panel with a pricing
+      editor.
+    shapes: [fullstack]
+    skills: [nextjs, rest-apis]
     strength: 3
 
-  - id: f_warehouse
-    role: r_data
+  - id: f_rag
+    project: p_example
     bullet: >-
-      Built the ingestion layer for a 4TB analytics warehouse, with schema contracts
-      that failed loudly at load time instead of silently corrupting downstream tables.
-    shapes: [product_python, ml_platform, research]
-    skills: [sql, airflow, python, postgresql]
-    metrics: [volume]
+      Built a full-stack RAG app that chunks documents, embeds them with
+      **all-MiniLM-L6-v2**, retrieves by cosine similarity, and generates grounded answers.
+    shapes: [ai_engineer, backend_python, fullstack]
+    skills: [rag, embeddings, python]
+    strength: 5
+
+  - id: f_fastapi
+    project: p_example
+    bullet: >-
+      Designed a FastAPI backend with an embedding cache and a vanilla HTML/JS frontend.
+    shapes: [backend_python, ai_engineer, fullstack]
+    skills: [fastapi, python, caching]
     strength: 4
 
-  - id: f_forecasting
-    role: r_data
+  - id: f_dtype
+    project: p_example
     bullet: >-
-      Replaced a spreadsheet demand forecast with a gradient-boosted model, cutting
-      mean absolute percentage error from 22% to 9% across 300 SKUs.
-    shapes: [research, product_python]
-    skills: [scikit-learn, python, sql, model-evaluation]
-    metrics: [mape]
+      Debugged a float32/float64 dtype mismatch that corrupted similarity scores after
+      caching.
+    shapes: [backend_python, ai_engineer]
+    skills: [python, debugging]
     strength: 4
-
-  - id: f_dbt_tests
-    role: r_data
-    bullet: >-
-      Added data quality tests to 60 transformation models, catching upstream schema
-      drift before it reached the dashboards finance relied on.
-    shapes: [research, product_python, ml_platform]
-    skills: [sql, ci-cd, airflow]
-    metrics: [coverage]
-    strength: 3
-
-  - id: f_go_service
-    role: r_data
-    bullet: >-
-      Wrote a Go sidecar for high-volume event validation, holding 12k events per
-      second on a single node where the Python version managed 2k.
-    shapes: [product_python, ml_platform]
-    skills: [go, kafka, docker]
-    metrics: [throughput]
-    strength: 3

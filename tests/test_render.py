@@ -1,58 +1,76 @@
-"""Rendering, and the extraction check that makes the PDF trustworthy."""
+"""Rendering, and the extraction checks that make the PDF trustworthy."""
 
 from __future__ import annotations
 
 from docx import Document
+from pdfminer.high_level import extract_text
 
 from resume.docx_render import render_docx
 from resume.render import main
 from resume.schema import Shape
 from resume.select import select
 from resume.typst_render import render_pdf
-from resume.verify import normalise, verify_pdf
+from resume.verify import TRUE_ORDER, normalise, reading_order_risks, verify_pdf
 
 
 def test_every_shape_renders_and_survives_extraction(profile, tmp_path):
     """The regression test for the whole ATS-safety claim.
 
-    It once failed for real: right-aligning the employment dates with `#h(1fr)`
-    looked correct on screen but made the extractor emit the date in the middle
-    of the first bullet, so an ATS read mangled prose. Any layout change that
-    reorders the text layer fails here rather than in a recruiter's inbox.
+    It once failed for real: right-aligning the dates made the extractor emit
+    the date in the middle of the first bullet. Any layout change that reorders
+    the text layer fails here rather than in a recruiter's inbox.
     """
     for shape in Shape:
-        selection = select(profile, shape)
-        pdf = render_pdf(profile, selection, tmp_path / f"{shape.value}.pdf")
-        assert pdf.exists() and pdf.stat().st_size > 0
-        assert verify_pdf(pdf, profile, selection) == []
+        for date_style in ("tab", "inline"):
+            selection = select(profile, shape)
+            pdf = render_pdf(
+                profile, selection, tmp_path / f"{shape.value}-{date_style}.pdf",
+                date_style=date_style,
+            )
+            assert pdf.exists() and pdf.stat().st_size > 0
+            assert verify_pdf(pdf, profile, selection) == []
+
+
+def test_inline_dates_remove_the_naive_parser_risk(profile, tmp_path):
+    """The escape hatch has to actually work.
+
+    With dates at the right margin the PDF is correct but a parser that groups
+    by proximity can read one into the following bullet. Inline dates leave
+    nothing to misgroup, and this asserts it rather than assuming it.
+    """
+    selection = select(profile, Shape.fullstack)
+    inline = render_pdf(profile, selection, tmp_path / "inline.pdf", date_style="inline")
+    assert reading_order_risks(inline, selection) == []
 
 
 def test_pdf_carries_contact_details_and_work_auth_line(profile, tmp_path):
-    selection = select(profile, Shape.ml_platform)
+    selection = select(profile, Shape.ai_engineer)
     pdf = render_pdf(profile, selection, tmp_path / "r.pdf")
 
-    from pdfminer.high_level import extract_text
-
-    text = normalise(extract_text(str(pdf)))
+    text = normalise(extract_text(str(pdf), laparams=TRUE_ORDER))
     assert normalise(profile.identity.name) in text
     assert normalise(profile.identity.email) in text
-    assert normalise("Toronto, ON") in text
+    assert normalise(selection.headline) in text
     assert normalise("Authorised to work in Canada") in text
 
 
-def test_pdf_has_no_page_header_or_footer_artifacts(profile, tmp_path):
-    """Contact details belong in the body; a repeated header breaks parsers."""
-    selection = select(profile, Shape.product_python)
+def test_work_auth_line_can_be_turned_off(profile, tmp_path):
+    selection = select(profile, Shape.ai_engineer)
+    pdf = render_pdf(profile, selection, tmp_path / "r.pdf", work_auth_line=False)
+    text = normalise(extract_text(str(pdf), laparams=TRUE_ORDER))
+    assert normalise("Authorised to work in Canada") not in text
+
+
+def test_pdf_has_no_repeated_header_artifacts(profile, tmp_path):
+    """Contact details belong in the body; a repeated page header breaks parsers."""
+    selection = select(profile, Shape.fullstack)
     pdf = render_pdf(profile, selection, tmp_path / "r.pdf")
-
-    from pdfminer.high_level import extract_text
-
-    text = normalise(extract_text(str(pdf)))
+    text = normalise(extract_text(str(pdf), laparams=TRUE_ORDER))
     assert text.count(normalise(profile.identity.email)) == 1
 
 
-def test_docx_contains_every_bullet(profile, tmp_path):
-    selection = select(profile, Shape.ml_platform)
+def test_docx_matches_the_pdf_content(profile, tmp_path):
+    selection = select(profile, Shape.fullstack)
     path = render_docx(profile, selection, tmp_path / "r.docx")
 
     doc = Document(str(path))
@@ -62,41 +80,36 @@ def test_docx_contains_every_bullet(profile, tmp_path):
     assert not doc.tables, "tables break ATS parsing"
 
 
+def test_docx_preserves_inline_bold(profile, tmp_path):
+    """Bolding must not drift between the PDF and DOCX paths."""
+    selection = select(profile, Shape.fullstack)
+    path = render_docx(profile, selection, tmp_path / "r.docx")
+
+    doc = Document(str(path))
+    bolded = {
+        r.text
+        for p in doc.paragraphs
+        for r in p.runs
+        if r.bold and p.style is not None and p.style.name == "List Bullet"
+    }
+    assert "35%" in bolded
+
+
 def test_cli_renders_and_reports(tmp_path, capsys):
     out = tmp_path / "out.pdf"
     code = main(
         [
             "--profile", "profile.example.yaml",
-            "--shape", "ml_platform",
+            "--shape", "fullstack",
             "--out", str(out),
             "--docx", str(tmp_path / "out.docx"),
         ]
     )
     assert code == 0
     assert out.exists()
-    captured = capsys.readouterr().out
-    assert "traceability ok, PDF text layer verified" in captured
+    assert "traceability ok, PDF text layer verified" in capsys.readouterr().out
 
 
 def test_cli_depth_only_needs_no_shape(capsys):
     assert main(["--profile", "profile.example.yaml", "--depth-only"]) == 0
     assert "Fact bank depth by shape" in capsys.readouterr().out
-
-
-def test_skill_labels_are_display_only(profile, tmp_path):
-    """Canonical tokens are what gets verified; labels are only printed.
-
-    Keyword matching wants `ci-cd` and `aws`; a reader wants CI/CD and AWS.
-    Splitting the two keeps both honest.
-    """
-    from resume.typst_render import build_payload
-
-    selection = select(profile, Shape.ml_platform)
-    payload = build_payload(profile, selection)
-    printed = {s for group in payload["skills"] for s in group["items"]}
-
-    assert "CI/CD" in printed or "AWS" in printed
-    assert "ci-cd" not in printed and "aws" not in printed
-    # The selection itself still holds canonical tokens, so verification is unaffected.
-    canonical = {s for group in selection.skills.values() for s in group}
-    assert canonical <= profile.declared_skills
