@@ -1,0 +1,62 @@
+# Canadian employers that hire Python / AI / backend engineers.
+# `slugs` are candidate job-board tokens to probe; `detect.py` finds which ATS
+# each company actually uses rather than guessing, because that changes.
+# Enterprises on Workday need their tenant URL filled in by hand — there is no
+# way to derive `<employer>.wdN.myworkdayjobs.com` from a company name.
+
+companies:
+  # --- AI / ML first -----------------------------------------------------
+  - {name: Cohere,            city: Toronto,    slugs: [cohere]}
+  - {name: Waabi,             city: Toronto,    slugs: [waabi]}
+  - {name: Ada,               city: Toronto,    slugs: [ada, adasupport]}
+  - {name: BenchSci,          city: Toronto,    slugs: [benchsci]}
+  - {name: Deep Genomics,     city: Toronto,    slugs: [deepgenomics]}
+  - {name: Tenstorrent,       city: Toronto,    slugs: [tenstorrent]}
+  - {name: Untether AI,       city: Toronto,    slugs: [untetherai]}
+  - {name: Sanctuary AI,      city: Vancouver,  slugs: [sanctuaryai, sanctuary]}
+  - {name: Vector Institute,  city: Toronto,    slugs: [vectorinstitute]}
+  - {name: Borealis AI,       city: Toronto,    slugs: [borealisai]}
+  - {name: Layer 6 AI,        city: Toronto,    slugs: [layer6, layer6ai]}
+
+  # --- Product / SaaS ----------------------------------------------------
+  - {name: Shopify,           city: Ottawa,     slugs: [shopify]}
+  - {name: Wealthsimple,      city: Toronto,    slugs: [wealthsimple]}
+  - {name: Clio,              city: Burnaby,    slugs: [clio, themissolutions]}
+  - {name: Jobber,            city: Edmonton,   slugs: [jobber, getjobber]}
+  - {name: 1Password,         city: Toronto,    slugs: [1password, agilebits]}
+  - {name: Vidyard,           city: Kitchener,  slugs: [vidyard]}
+  - {name: Coveo,             city: Quebec City, slugs: [coveo]}
+  - {name: Kinaxis,           city: Ottawa,     slugs: [kinaxis]}
+  - {name: D2L,               city: Kitchener,  slugs: [d2l, desire2learn]}
+  - {name: Vena Solutions,    city: Toronto,    slugs: [vena, venasolutions]}
+  - {name: Hootsuite,         city: Vancouver,  slugs: [hootsuite]}
+  - {name: Later,             city: Vancouver,  slugs: [later, latermedia]}
+  - {name: Benevity,          city: Calgary,    slugs: [benevity]}
+  - {name: Lightspeed Commerce, city: Montreal, slugs: [lightspeed, lightspeedhq]}
+  - {name: PointClickCare,    city: Mississauga, slugs: [pointclickcare]}
+  - {name: League,            city: Toronto,    slugs: [league]}
+  - {name: Dialogue,          city: Montreal,   slugs: [dialogue, dialoguetech]}
+  - {name: Ecobee,            city: Toronto,    slugs: [ecobee]}
+  - {name: Wattpad,           city: Toronto,    slugs: [wattpad]}
+  - {name: FreshBooks,        city: Toronto,    slugs: [freshbooks]}
+  - {name: Float,             city: Toronto,    slugs: [float, floatfinancial]}
+  - {name: Neo Financial,     city: Calgary,    slugs: [neofinancial, neo]}
+  - {name: KOHO,              city: Toronto,    slugs: [koho, kohofinancial]}
+  - {name: Nuvei,             city: Montreal,   slugs: [nuvei]}
+  - {name: Questrade,         city: Toronto,    slugs: [questrade]}
+  - {name: Clearco,           city: Toronto,    slugs: [clearco, clearbanc]}
+  - {name: Absolute Software, city: Vancouver,  slugs: [absolutesoftware, absolute]}
+  - {name: Bench Accounting,  city: Vancouver,  slugs: [bench, benchaccounting]}
+  - {name: Thomson Reuters,   city: Toronto,    slugs: [thomsonreuters]}
+
+  # --- Enterprise: Workday or Taleo, tenant must be filled in by hand ----
+  - {name: RBC,        city: Toronto,  workday_tenant: null}
+  - {name: TD Bank,    city: Toronto,  workday_tenant: null}
+  - {name: Scotiabank, city: Toronto,  workday_tenant: null}
+  - {name: BMO,        city: Toronto,  workday_tenant: null}
+  - {name: CIBC,       city: Toronto,  workday_tenant: null}
+  - {name: Telus,      city: Vancouver, workday_tenant: null}
+  - {name: Bell,       city: Montreal, workday_tenant: null}
+  - {name: Sun Life,   city: Toronto,  workday_tenant: null}
+  - {name: Manulife,   city: Toronto,  workday_tenant: null}
+  - {name: OMERS,      city: Toronto,  workday_tenant: null}

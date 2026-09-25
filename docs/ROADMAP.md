@@ -180,8 +180,11 @@ assessment email reaches your phone within the hour.
 
 Nothing blocking Phase 1.
 
-1. **Target employers**, to seed the company watchlist — see §5 on tenant detection. Ten names
-   is enough to start.
+1. **Workday tenant URLs** for the ten enterprises in `discover/watchlist.yaml`. A tenant
+   (`<employer>.wdN.myworkdayjobs.com/<site>`) cannot be derived from a company name, so it is
+   the one part of the watchlist that has to be pasted in by hand — once per employer, ever.
+2. **Run `python -m discover.detect`** somewhere with network access to the job-board hosts, and
+   commit the resulting `discover/detected.yaml`.
 3. **Whether `profile.yaml` should be committed.** It is gitignored today because it holds
    personal data; committing it to a private repository would make the fact bank survive a fresh
    checkout.

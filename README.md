@@ -48,6 +48,23 @@ Present** uploads." The layout is kept because it is the established format and 
 parser reads it correctly; `--date-style inline` removes the risk for anyone who would rather
 not take it.
 
+## Who to watch
+
+`discover/watchlist.yaml` holds 50 Canadian employers that hire Python, AI and backend
+engineers: 40 with candidate job-board tokens to probe, and 10 enterprises whose Workday
+tenant has to be filled in by hand.
+
+```bash
+.venv/bin/python -m discover.detect --watchlist discover/watchlist.yaml \
+    --out discover/detected.yaml
+```
+
+It asks each company's public job-board endpoint which ATS they actually use, rather than
+guessing from a list that goes stale. One request per second, honest User-Agent, public
+endpoints only, no logins. Needs network access to `boards-api.greenhouse.io`,
+`api.lever.co`, `api.ashbyhq.com`, `apply.workable.com`, `api.smartrecruiters.com` and
+`*.recruitee.com`.
+
 ## Design principles
 
 1. **Human presses submit.** The system does everything up to the submit button. This is
