@@ -72,3 +72,65 @@ class Stats(BaseModel):
     total_jobs: int
     by_status: dict[str, int]
     applied_this_week: int
+
+
+class FieldIn(BaseModel):
+    """One control the content script found on the form."""
+
+    id: str
+    label: str = ""
+    type: str = "text"
+    options: list[str] = Field(default_factory=list)
+    required: bool = False
+    automation_id: str = ""
+
+
+class ResolveRequest(BaseModel):
+    fields: list[FieldIn]
+    job_id: int | None = None
+    ats: str | None = None
+    shape: str | None = None
+
+
+class FillOut(BaseModel):
+    field_id: str
+    value: str | None = None
+    action: str
+    source: str = ""
+    confidence: str = "low"
+    reason: str = ""
+
+
+class ResolveResponse(BaseModel):
+    fills: list[FillOut]
+    filled: int
+    skipped: int
+    unmatched: int
+    resume_url: str | None = None
+
+
+class AccountIn(BaseModel):
+    ats_type: str = "workday"
+    tenant: str
+    username: str
+    password: str
+    company: str | None = None
+    notes: str | None = None
+
+
+class AccountOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    ats_type: str
+    tenant: str
+    username: str
+    last_application_id: int | None = None
+    notes: str | None = None
+
+
+class AutofillLog(BaseModel):
+    application_id: int
+    ats: str
+    step: str | None = None
+    filled: dict[str, str | None] = Field(default_factory=dict)
+    corrected: dict[str, str | None] = Field(default_factory=dict)

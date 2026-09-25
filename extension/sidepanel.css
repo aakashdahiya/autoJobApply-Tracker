@@ -56,3 +56,13 @@ button:hover { filter: brightness(1.08); }
 .badge.applied, .badge.interview, .badge.offer { color: var(--applied); border-color: var(--applied); }
 .badge.rejected, .badge.ghosted { opacity: 0.65; }
 .empty { color: var(--muted); text-align: center; padding: 28px 8px; }
+
+.actions { display: flex; gap: 6px; }
+.actions .primary { flex: 1; }
+button.primary.alt { background: transparent; color: var(--accent); }
+.shape { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.shape select {
+  flex: 1; font: inherit; padding: 4px 6px; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+}
+.legend { color: var(--muted); font-size: 11px; margin: 6px 0 0; }

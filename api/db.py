@@ -107,6 +107,27 @@ class Application(Base):
     )
 
 
+class AtsAccount(Base):
+    """One row per Workday/Taleo tenant, because each employer is its own login.
+
+    `secret_ref` points into the OS keychain. There is deliberately no password
+    column: a database file is copied, backed up and opened far more casually
+    than a keychain is.
+    """
+
+    __tablename__ = "ats_accounts"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), index=True)
+    ats_type: Mapped[str] = mapped_column(String(40))
+    tenant: Mapped[str] = mapped_column(String(200), index=True)
+    username: Mapped[str] = mapped_column(String(200))
+    secret_ref: Mapped[str] = mapped_column(String(300), unique=True)
+    last_application_id: Mapped[int | None] = mapped_column(Integer)
+    profile_last_synced_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class Event(Base):
     """Append-only. When you wonder why the system thinks something, look here."""
 

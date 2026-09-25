@@ -59,7 +59,26 @@ class Identity(Model):
     city: str
     province: str = Field(pattern=r"^(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)$")
     area: str | None = None  # e.g. "Toronto Area" — what a recruiter searches for
+    street: str | None = None      # application forms ask; the resume never shows it
+    postal_code: str | None = None
+    country: str = "Canada"
     links: list[str] = Field(default_factory=list)
+
+    @property
+    def first_name(self) -> str:
+        return self.name.split()[0]
+
+    @property
+    def last_name(self) -> str:
+        parts = self.name.split()
+        return " ".join(parts[1:]) if len(parts) > 1 else ""
+
+    def link(self, kind: str) -> str | None:
+        """The first link whose text mentions `kind` (linkedin, github, ...)."""
+        for url in self.links:
+            if kind in url.casefold():
+                return url
+        return None
 
     @property
     def location(self) -> str:
@@ -221,6 +240,7 @@ class Profile(Model):
     projects: list[Project] = Field(default_factory=list)
     education: list[Education] = Field(default_factory=list)
     facts: list[Fact] = Field(min_length=1)
+    answers: dict[str, str] = Field(default_factory=dict)
 
     def role(self, role_id: str) -> Role:
         for r in self.experience:

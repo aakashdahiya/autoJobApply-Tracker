@@ -5,7 +5,7 @@
   "type": "module",
   "description": "MV3 extension. No build step: load extension/ unpacked in Chrome.",
   "scripts": {
-    "test": "node --test tests/"
+    "test": "node --test tests/*.mjs"
   },
   "devDependencies": {
     "jsdom": "^24.0.0"

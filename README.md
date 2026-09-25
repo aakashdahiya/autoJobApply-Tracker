@@ -76,6 +76,49 @@ apply twice.
 npm test --prefix extension         # 12 capture tests against real DOMs
 ```
 
+## Phase 2 is built: assisted apply
+
+With the tracker running and the extension loaded, open a posting's application form and press
+**Fill this form** in the side panel. It fills every field it can, attaches the tailored resume
+for the shape you picked, and outlines what it touched — green for filled, amber for corrected,
+yellow for "your turn".
+
+**It never clicks submit.** You review and submit. When the confirmation page appears, the
+extension recognises it and moves the application to `applied` on its own, which is why the
+tracker stays honest without anyone remembering to update it.
+
+The matching logic lives in `api/autofill.py`, not in the extension: the content script
+enumerates the fields it can see, the API decides what belongs in each one. A new ATS then needs
+new *selectors*, not new rules, and every rule is testable without a browser.
+
+Four things it will not do:
+
+- **Generate motivation text.** "Why this company" comes back as a skip. A generated answer to
+  that question is visibly generated.
+- **Autofill a password.** Credentials are handled only through the keychain-backed vault below.
+- **Guess.** An unmatched label is reported as unmatched. One wrong value teaches you to stop
+  trusting the whole fill, which costs more than a blank field.
+- **Disclose anything voluntary** unless `self_id.mode` is `disclose`, and then only by matching
+  the options the page itself offers.
+
+### Workday
+
+Workday gets the most attention because it holds the most Canadian enterprise hiring, and
+because it inverts the usual problem: it parses your resume and fills the form itself, usually
+getting something wrong. So the adapter diffs its parse against `profile.yaml` and corrects the
+differences — corrections are counted and outlined separately from fresh fills.
+
+Per-tenant accounts are the other half. Every employer is its own Workday login, which is the
+worst friction in the whole process:
+
+```bash
+curl -X POST http://127.0.0.1:8765/ats-accounts -H 'Content-Type: application/json' \
+  -d '{"tenant":"rbc","username":"you@example.com","password":"…","company":"RBC"}'
+```
+
+The password goes to the OS keychain; the database stores only a reference to it. If no keychain
+is available the call fails rather than quietly writing a plaintext fallback.
+
 ## Who to watch
 
 `discover/watchlist.yaml` holds 50 Canadian employers that hire Python, AI and backend

@@ -33,6 +33,11 @@ constraints:
   notice_period_days: 0
   french_level: none
 
+# Free-text answers to the questions no rule can derive. Matched by substring.
+answers:
+  how did you hear about us: Company careers page
+  why do you want to work here: ""      # left blank on purpose; write it per application
+
 self_id:                     # voluntary; quoted for clarity
   mode: disclose
   gender: man

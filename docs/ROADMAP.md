@@ -47,7 +47,7 @@ it. Verified end to end against a running server.
 
 ---
 
-## Phase 2 — Assisted apply, Workday included (~2.5 weeks)
+## Phase 2 — Assisted apply, Workday included — **done**
 
 The phase that actually saves the time. Longer than the others because Workday is in it from the
 start, which is the right call for this market — see the cost note below.
@@ -74,6 +74,11 @@ start, which is the right call for this market — see the cost note below.
 
 **Done when:** a Greenhouse application goes from panel to submitted in under 30 seconds and
 the status flips to `applied` by itself.
+
+**Built:** shared field-map layer with the matching in Python, per-tenant credential vault on
+the OS keychain, resume-parse-correction diffing, confirmation-page detection, and the resume
+served to the extension over localhost so it can attach it to a file input. 26 extension tests
+run the real content scripts against real DOMs.
 
 **Cost of Workday-first, stated plainly:** the Workday adapter is roughly a week and a half
 against two or three days for the other three combined, so it pushes this phase from about one

@@ -7,7 +7,18 @@
   </head>
   <body>
     <header>
-      <button id="capture" class="primary">Save this job</button>
+      <div class="actions">
+        <button id="capture" class="primary">Save this job</button>
+        <button id="fill" class="primary alt">Fill this form</button>
+      </div>
+      <label class="shape">
+        Resume shape
+        <select id="shape">
+          <option value="ai_engineer">AI engineer</option>
+          <option value="backend_python">Backend / Python</option>
+          <option value="fullstack">Full-stack</option>
+        </select>
+      </label>
       <div id="stats" class="stats"></div>
     </header>
 

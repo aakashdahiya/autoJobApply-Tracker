@@ -14,6 +14,9 @@ const NEXT_STATUS = {
 };
 
 let apiBase = "http://127.0.0.1:8765";
+// Which application the next fill belongs to, so a confirmation page can move
+// the right row. Set by "apply" on a job card.
+let currentApplicationId = null;
 
 const show = (text, warn = false) => {
   const node = $("message");
@@ -53,6 +56,18 @@ function jobCard(job) {
   badge.className = `badge ${app.status}`;
   badge.textContent = app.status;
   row.append(badge);
+
+  if (["discovered", "scored", "tailored", "ready"].includes(app.status)) {
+    const apply = document.createElement("button");
+    apply.textContent = "apply";
+    apply.title = "Open the posting and target the next fill at this application";
+    apply.addEventListener("click", async () => {
+      currentApplicationId = app.id;
+      await chrome.tabs.create({ url: job.apply_url, active: true });
+      show(`Targeting ${job.title} — open the form, then press "Fill this form".`);
+    });
+    row.append(apply);
+  }
 
   for (const next of NEXT_STATUS[app.status] || []) {
     const button = document.createElement("button");
@@ -110,6 +125,42 @@ async function refresh() {
   }
 }
 
+function summarise(s) {
+  const bits = [`${s.filled} filled`];
+  if (s.corrected) bits.push(`${s.corrected} corrected`);
+  if (s.skipped) bits.push(`${s.skipped} left for you`);
+  if (s.unmatched) bits.push(`${s.unmatched} unmatched`);
+  if (s.failed && s.failed.length) bits.push(`${s.failed.length} failed`);
+  if (s.attached && s.attached.ok) bits.push("resume attached");
+  let text = `${bits.join(", ")}. Review, then submit yourself.`;
+  if (s.reuseOffered) {
+    text += " Workday offers to reuse your last application here — that is faster and more accurate.";
+  }
+  return text;
+}
+
+$("fill").addEventListener("click", async () => {
+  const button = $("fill");
+  button.disabled = true;
+  button.textContent = "Filling…";
+  const result = await chrome.runtime.sendMessage({
+    type: "fill",
+    shape: $("shape").value,
+    applicationId: currentApplicationId,
+  });
+  button.disabled = false;
+  button.textContent = "Fill this form";
+  if (!result || !result.ok) {
+    show((result && result.error) || "Could not fill this page.", true);
+    return;
+  }
+  show(summarise(result.summary), Boolean(result.summary.failed.length));
+});
+
+$("shape").addEventListener("change", () => {
+  chrome.storage.sync.set({ shape: $("shape").value });
+});
+
 $("capture").addEventListener("click", async () => {
   const button = $("capture");
   button.disabled = true;
@@ -132,6 +183,10 @@ $("search").addEventListener("input", () => {
 $("status").addEventListener("change", refresh);
 chrome.runtime.onMessage.addListener((m) => {
   if (m.type === "jobs-changed") refresh();
+});
+
+chrome.storage.sync.get("shape").then(({ shape }) => {
+  if (shape) $("shape").value = shape;
 });
 
 chrome.runtime.sendMessage({ type: "api-base" }).then((base) => {
