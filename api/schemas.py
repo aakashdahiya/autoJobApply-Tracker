@@ -134,3 +134,28 @@ class AutofillLog(BaseModel):
     step: str | None = None
     filled: dict[str, str | None] = Field(default_factory=dict)
     corrected: dict[str, str | None] = Field(default_factory=dict)
+
+
+class ScoreOut(BaseModel):
+    job_id: int
+    total: float
+    shape: str
+    shape_confidence: float
+    passes: bool
+    reason: str
+    required_matched: list[str]
+    gaps: list[str]
+    preferred_matched: list[str]
+    years_required: int | None = None
+    years_have: float = 0.0
+    years_penalty: float = 0.0
+
+
+class TailorOut(BaseModel):
+    job_id: int
+    score: ScoreOut
+    tailored: bool
+    resume_path: str | None = None
+    docx_path: str | None = None
+    rephrased: int = 0
+    note: str = ""

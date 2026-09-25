@@ -160,3 +160,77 @@ def test_missing_application_is_404(client):
 
 def test_capture_rejects_a_blank_title(client):
     assert post_job(client, title="").status_code == 422
+
+
+# --- scoring and tailoring --------------------------------------------------
+
+AI_JD = """Senior AI Engineer
+
+What you'll need:
+- 2+ years of Python
+- LLMs, RAG and embeddings
+- FastAPI and Postgres
+
+Nice to have:
+- Next.js and React
+"""
+
+WRONG_JD = """Staff Platform Engineer
+
+Requirements:
+- 10+ years with Java, Scala and Spring Boot
+- Kubernetes, Terraform and AWS at scale
+"""
+
+
+def test_scoring_records_the_verdict_and_the_shape(client):
+    job_id = post_job(client, description=AI_JD).json()["job"]["id"]
+    body = client.post(f"/jobs/{job_id}/score").json()
+
+    assert body["passes"] is True
+    assert body["shape"] == "ai_engineer"
+    assert {"python", "rag", "embeddings"} <= set(body["required_matched"])
+    assert client.get(f"/jobs/{job_id}").json()["application"]["status"] == "scored"
+
+
+def test_a_poor_match_is_skipped_with_a_reason_recorded(client):
+    """A skip has to say why, or you relitigate it every time it reappears."""
+    job_id = post_job(client, description=WRONG_JD).json()["job"]["id"]
+    body = client.post(f"/jobs/{job_id}/score").json()
+
+    assert body["passes"] is False
+    assert body["gaps"]
+    job = client.get(f"/jobs/{job_id}").json()
+    assert job["application"]["status"] == "skipped"
+
+    session = client.session_factory()
+    events = session.get(Application, job["application"]["id"]).events
+    assert any(e.kind == "scored" and e.payload["gaps"] for e in events)
+    session.close()
+
+
+def test_tailoring_renders_a_resume_and_links_it(client):
+    job_id = post_job(client, description=AI_JD).json()["job"]["id"]
+    body = client.post(f"/jobs/{job_id}/tailor").json()
+
+    assert body["tailored"] is True
+    assert body["resume_path"].endswith(".pdf")
+    from pathlib import Path
+
+    assert Path(body["resume_path"]).exists()
+    job = client.get(f"/jobs/{job_id}").json()
+    assert job["application"]["status"] == "tailored"
+    assert job["application"]["resume_path"] == body["resume_path"]
+
+
+def test_the_gate_stops_tailoring_unless_forced(client):
+    job_id = post_job(client, description=WRONG_JD).json()["job"]["id"]
+    assert client.post(f"/jobs/{job_id}/tailor").json()["tailored"] is False
+    assert client.post(f"/jobs/{job_id}/tailor", params={"force": True}).json()["tailored"] is True
+
+
+def test_scoring_a_job_with_no_description_is_a_clear_error(client):
+    job_id = post_job(client).json()["job"]["id"]
+    response = client.post(f"/jobs/{job_id}/score")
+    assert response.status_code == 409
+    assert "description" in response.json()["detail"]

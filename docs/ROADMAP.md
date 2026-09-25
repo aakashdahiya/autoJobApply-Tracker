@@ -90,7 +90,7 @@ Partial fill (steps 1–2, then hand over) counts as done for the first pass.
 
 ---
 
-## Phase 3 — Scoring and tailoring (~1 week)
+## Phase 3 — Scoring and tailoring — **done**
 
 - JD extraction into a Pydantic schema, cached on `description_hash`.
 - Match scoring; threshold gate; skip reasons recorded.
@@ -107,8 +107,10 @@ Partial fill (steps 1–2, then hand over) counts as done for the first pass.
 - Write the tailored resume to `resumes/` and a readable copy to a Google Docs folder; link
   both from the sheet.
 
-**Done when:** a tailored resume for a real JD passes validation, reads better than your
-master for that role, and the gap report tells you honestly what you are missing.
+**Done:** deterministic extraction, shape classification, scoring with a seniority penalty,
+a gate that records its skip reasons, JD caching by description hash, and constrained rephrasing
+behind an optional model call that is discarded whenever it fails re-validation. The gap report
+is honest about what is missing rather than papering over it.
 
 ---
 

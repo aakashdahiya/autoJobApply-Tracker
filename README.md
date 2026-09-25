@@ -119,6 +119,45 @@ curl -X POST http://127.0.0.1:8765/ats-accounts -H 'Content-Type: application/js
 The password goes to the OS keychain; the database stores only a reference to it. If no keychain
 is available the call fails rather than quietly writing a plaintext fallback.
 
+## Phase 3 is built: scoring and tailoring
+
+```bash
+python -m tailor.run --jd posting.txt                       # score only
+python -m tailor.run --jd posting.txt --tailor --out out/x.pdf
+python -m tailor.run --jd posting.txt --tailor --rephrase --out out/x.pdf
+```
+
+Or through the API, on a job the extension already captured:
+`POST /jobs/{id}/score` and `POST /jobs/{id}/tailor`.
+
+**The gate runs before anything expensive.** It reads the posting for the technologies it
+actually names, classifies it into one of the three shapes, compares it against what the fact
+bank can support, and penalises a seniority gap that a keyword score would otherwise miss
+entirely. Below the threshold the application is marked `skipped` **with the reason recorded**,
+so a posting that reappears next week is not relitigated from scratch.
+
+Everything up to this point is deterministic and needs no API key: vocabulary extraction, the
+required/nice-to-have split, shape classification, scoring, and the gap report. JD analysis is
+cached by `description_hash`, because the same posting arrives from LinkedIn, the company board
+and the nightly crawl.
+
+**`--rephrase` is the only step that calls a model.** It may reword a bullet that is already on
+the page to use the posting's vocabulary. It may not add a bullet, drop one, change a number or
+claim a skill — and that is not enforced by asking nicely. The response is re-validated by the
+same traceability checks from Phase 0, and anything that fails is discarded in favour of the
+original wording. A resume that is merely untailored is fine; one that is subtly false is not.
+No credential, an API error, or a response that does not validate all land in the same place:
+the original text, unchanged.
+
+Install the optional dependency only if you want that step:
+
+```bash
+.venv/bin/pip install "anthropic>=0.40"   # then export ANTHROPIC_API_KEY
+```
+
+**Gaps are a skip signal and a learning list.** They are never an instruction to claim the
+missing thing.
+
 ## Who to watch
 
 `discover/watchlist.yaml` holds 50 Canadian employers that hire Python, AI and backend
