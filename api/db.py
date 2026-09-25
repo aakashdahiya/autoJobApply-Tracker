@@ -107,6 +107,47 @@ class Application(Base):
     )
 
 
+class EmailLink(Base):
+    """One Gmail message, and what we made of it.
+
+    Keyed on the Gmail message id so a re-sync is idempotent. `application_id`
+    is null for an orphan — an email we could not confidently attach to an
+    application, which goes in the digest for you to place rather than being
+    guessed at.
+    """
+
+    __tablename__ = "email_links"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    gmail_message_id: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    gmail_thread_id: Mapped[str | None] = mapped_column(String(80), index=True)
+    application_id: Mapped[int | None] = mapped_column(
+        ForeignKey("applications.id"), index=True
+    )
+    classification: Mapped[str] = mapped_column(String(40), index=True)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    sender: Mapped[str | None] = mapped_column(String(300))
+    subject: Mapped[str | None] = mapped_column(String(500))
+    received_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    deadline_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    extracted: Mapped[dict | None] = mapped_column(JSON)
+    reviewed: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class SyncState(Base):
+    """Where the last Gmail sync got to.
+
+    Incremental via historyId: a sweep reads the handful of messages that
+    arrived, never the whole mailbox.
+    """
+
+    __tablename__ = "sync_state"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source: Mapped[str] = mapped_column(String(40), unique=True)
+    cursor: Mapped[str | None] = mapped_column(String(80))
+    last_synced_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+
+
 class AtsAccount(Base):
     """One row per Workday/Taleo tenant, because each employer is its own login.
 

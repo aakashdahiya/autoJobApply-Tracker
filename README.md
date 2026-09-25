@@ -158,6 +158,57 @@ Install the optional dependency only if you want that step:
 **Gaps are a skip signal and a learning list.** They are never an instruction to claim the
 missing thing.
 
+## Phase 4 is built: email triage
+
+```bash
+.venv/bin/pip install ".[gmail]"          # then run once to complete OAuth consent
+python -m inbox.run --sync --ghost --digest
+```
+
+A rejection email moves the row to `rejected` without you touching it. An assessment with a
+72-hour window is surfaced immediately, because that is the single most expensive thing to
+miss. Silence becomes `ghosted` after 21 days, so the pipeline shows reality rather than 200
+rows of hope.
+
+```
+NEEDS YOU NOW
+  • [assessment] Next step: coding challenge
+    due Sun 27 Sep 08:00 — 48h left
+  • [interview_invite] Interview — ML Engineer
+    RBC Careers <talent@rbc.ca>
+
+COULD NOT PLACE (tell me which application)
+  • PyCoder's Weekly #640
+    news@python.org — weak signal (none)
+```
+
+Classification is rule-based and deterministic. Recruiting email is unusually formulaic, so a
+curated phrase list gets most of the way, costs nothing, and can be read and corrected when it
+is wrong — none of which is true of a model call on every message in your inbox. Ordering is
+the part that matters: nearly every rejection opens with "thank you for applying", so
+acknowledgement phrases must never outrank rejection phrases.
+
+Three rules keep it honest:
+
+- **Quoted history is stripped**, not merely truncated. A two-line interview invite above a
+  quoted rejection would otherwise be read as a rejection.
+- **An application only ever moves forward.** A late "we received your application" cannot undo
+  an interview, and a closed application is not reopened by a stray email.
+- **Ambiguity becomes an orphan.** Two applications at one company with nothing to separate
+  them are not guessed between — a misattached rejection closes the wrong one and hides a live
+  application. Orphans go in the digest for you to place, once, via
+  `PATCH /email-links/{id}`.
+
+Gmail is read-only and incremental by `historyId`: a sweep reads the handful of messages that
+arrived, never the whole mailbox. The Gmail-specific code sits behind one small class, so
+everything that decides anything is tested against plain dictionaries.
+
+Run it from cron once it is on a VPS:
+
+```cron
+30 7 * * * cd /srv/tracker && .venv/bin/python -m inbox.run --sync --ghost --digest
+```
+
 ## Who to watch
 
 `discover/watchlist.yaml` holds 50 Canadian employers that hire Python, AI and backend

@@ -15,12 +15,16 @@ dependencies = [
     "keyring>=24.0",
 ]
 
-[project.optional-dependencies.llm]
-# Only needed for `--rephrase`. Everything else runs without a model.
-anthropic = ["anthropic>=0.40"]
-
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+# Only needed for `--rephrase`. Everything else runs without a model.
+llm = ["anthropic>=0.40"]
+# Only needed to read your inbox. Triage itself is testable without it.
+gmail = [
+    "google-api-python-client>=2.100",
+    "google-auth-oauthlib>=1.2",
+    "google-auth-httplib2>=0.2",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

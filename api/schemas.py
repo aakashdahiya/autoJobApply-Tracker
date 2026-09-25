@@ -159,3 +159,44 @@ class TailorOut(BaseModel):
     docx_path: str | None = None
     rephrased: int = 0
     note: str = ""
+
+
+class EmailLinkOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    gmail_message_id: str
+    application_id: int | None = None
+    classification: str
+    confidence: float
+    sender: str | None = None
+    subject: str | None = None
+    received_at: dt.datetime | None = None
+    deadline_at: dt.datetime | None = None
+    reviewed: bool = False
+    extracted: dict | None = None
+
+
+class EmailLinkPatch(BaseModel):
+    application_id: int | None = None
+    reviewed: bool | None = None
+    apply_status: bool = False  # also move the application per the classification
+
+
+class SyncOut(BaseModel):
+    seen: int
+    linked: int
+    orphans: int
+    duplicates: int
+    moved: list[str]
+    urgent: list[str]
+
+
+class DigestOut(BaseModel):
+    generated_at: dt.datetime
+    urgent: list[dict]
+    ready_to_apply: list[dict]
+    moved: list[dict]
+    going_quiet: list[dict]
+    orphans: list[dict]
+    pipeline: dict[str, int]
+    text: str

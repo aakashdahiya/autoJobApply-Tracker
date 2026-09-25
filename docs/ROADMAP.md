@@ -114,7 +114,7 @@ is honest about what is missing rather than papering over it.
 
 ---
 
-## Phase 4 — Email triage (~4 evenings)
+## Phase 4 — Email triage — **done**
 
 - Gmail read-only OAuth; incremental sync on `history.startHistoryId`.
 - Classifier + extractor; assessment deadlines and interview slots pulled out.
@@ -123,8 +123,11 @@ is honest about what is missing rather than papering over it.
 - 08:00 digest; instant push for interview / assessment / offer.
 - `ghosted` auto-transition at 21 days.
 
-**Done when:** a rejection email moves a row to `rejected` without you touching it, and an
-assessment email reaches your phone within the hour.
+**Done:** rule-based classification with quoted-history stripping, deadline extraction,
+domain/name/title matching with an explicit orphan bucket, forward-only status movement,
+21-day ghosting, and a digest that leads with whatever is time-critical. Gmail access is
+read-only and incremental; the transport for an instant push is the one piece still to wire
+up, and the sweep already reports which items warrant one.
 
 ---
 

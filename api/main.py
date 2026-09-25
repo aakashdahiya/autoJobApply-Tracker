@@ -14,15 +14,15 @@ from sqlalchemy.orm import Session
 
 from api import store
 from api.db import (
-    OPEN_STATUSES, Application, AtsAccount, Company, Job, Status, make_engine,
-    make_session_factory, utcnow,
+    OPEN_STATUSES, Application, AtsAccount, Company, EmailLink, Job, Status,
+    make_engine, make_session_factory, utcnow,
 )
 from api import autofill, vault
 from api.autofill import FieldSpec
 from api.schemas import (
     AccountIn, AccountOut, ApplicationPatch, AutofillLog, CaptureResult,
-    FillOut, JobCapture, JobOut, ResolveRequest, ResolveResponse, ScoreOut,
-    Stats, TailorOut,
+    DigestOut, EmailLinkOut, EmailLinkPatch, FillOut, JobCapture, JobOut,
+    ResolveRequest, ResolveResponse, ScoreOut, Stats, SyncOut, TailorOut,
 )
 
 engine = make_engine()
@@ -435,3 +435,107 @@ def tailor_job(
         job_id=job.id, score=_score_out(job, jd, result), tailored=True,
         resume_path=str(pdf), docx_path=str(docx), rephrased=rephrased, note=note,
     )
+
+
+# ---------------------------------------------------------------------------
+# Inbox
+# ---------------------------------------------------------------------------
+
+@app.post("/inbox/sync", response_model=SyncOut)
+def inbox_sync(session: Session = Depends(get_session)) -> SyncOut:
+    """Pull new mail and move applications. Read-only against Gmail."""
+    from inbox.sync import GmailSource, build_gmail_service, sync as run_sync
+
+    try:
+        service = build_gmail_service()
+    except Exception as error:
+        raise HTTPException(
+            503,
+            f"Gmail is not connected ({type(error).__name__}). Run "
+            "`python -m inbox.run --sync` once to complete the OAuth consent.",
+        )
+    report = run_sync(session, GmailSource(service))
+    return SyncOut(
+        seen=report.seen, linked=report.linked, orphans=report.orphans,
+        duplicates=report.duplicates, moved=report.moved, urgent=report.urgent,
+    )
+
+
+@app.post("/inbox/ghost-sweep")
+def inbox_ghost_sweep(days: int = 21, session: Session = Depends(get_session)) -> dict:
+    """Silence is an outcome; record it rather than leaving rows hopeful."""
+    from inbox.sync import ghost_stale
+
+    ghosted = ghost_stale(session, days=days)
+    return {"ghosted": len(ghosted), "application_ids": ghosted, "days": days}
+
+
+@app.get("/inbox/digest", response_model=DigestOut)
+def inbox_digest(hours: int = 24, session: Session = Depends(get_session)) -> DigestOut:
+    from inbox import digest as digest_module
+
+    built = digest_module.build(session, since_hours=hours)
+    as_dicts = lambda items: [
+        {"text": i.text, "detail": i.detail,
+         "when": i.when.isoformat() if i.when else None} for i in items
+    ]
+    return DigestOut(
+        generated_at=built.generated_at,
+        urgent=as_dicts(built.urgent),
+        ready_to_apply=as_dicts(built.ready_to_apply),
+        moved=as_dicts(built.moved),
+        going_quiet=as_dicts(built.going_quiet),
+        orphans=as_dicts(built.orphans),
+        pipeline=built.pipeline,
+        text=digest_module.render(built),
+    )
+
+
+@app.get("/email-links", response_model=list[EmailLinkOut])
+def list_email_links(
+    orphans_only: bool = False,
+    unreviewed_only: bool = False,
+    limit: int = Query(100, le=500),
+    session: Session = Depends(get_session),
+) -> list[EmailLinkOut]:
+    stmt = select(EmailLink)
+    if orphans_only:
+        stmt = stmt.where(EmailLink.application_id.is_(None))
+    if unreviewed_only:
+        stmt = stmt.where(EmailLink.reviewed.is_(False))
+    stmt = stmt.order_by(EmailLink.created_at.desc()).limit(limit)
+    return list(session.scalars(stmt))
+
+
+@app.patch("/email-links/{link_id}", response_model=EmailLinkOut)
+def patch_email_link(
+    link_id: int, patch: EmailLinkPatch, session: Session = Depends(get_session)
+) -> EmailLinkOut:
+    """Place an orphan by hand, and optionally let it move the application.
+
+    The system will not guess which application an ambiguous email belongs to;
+    this is where you tell it, once.
+    """
+    from inbox.sync import IMPLIES, _should_move
+
+    link = session.get(EmailLink, link_id)
+    if link is None:
+        raise HTTPException(404, "no such email link")
+
+    if patch.application_id is not None:
+        application = session.get(Application, patch.application_id)
+        if application is None:
+            raise HTTPException(404, "no such application")
+        link.application_id = application.id
+        store.log(session, application, "email_placed_by_hand", "api",
+                  {"subject": link.subject, "classification": link.classification})
+        if patch.apply_status:
+            target = IMPLIES.get(link.classification)
+            if target is not None and _should_move(application.status, target):
+                store.set_status(session, application, target, source="gmail-manual",
+                                 note=link.subject)
+    if patch.reviewed is not None:
+        link.reviewed = patch.reviewed
+
+    session.commit()
+    return link
