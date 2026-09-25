@@ -209,6 +209,51 @@ Run it from cron once it is on a VPS:
 30 7 * * * cd /srv/tracker && .venv/bin/python -m inbox.run --sync --ghost --digest
 ```
 
+## Phase 5 is built: nightly discovery
+
+```bash
+python -m discover.detect                      # once: which ATS does each company use?
+python -m discover.crawl --tailor-top 5        # nightly: read boards, score, tailor the best
+```
+
+Reads each watchlist company's public board, keeps the Canadian engineering roles, captures
+them through the same deduplicating path the extension uses, scores everything, and renders
+resumes for the best of the night. Re-running adds nothing: a job already known is counted and
+skipped.
+
+```
+4/4 boards read, 8 postings, 5 filtered out, 3 new (0 already known), 3 passed the gate
+
+Best of tonight:
+  • Cohere — Senior AI Engineer (100)
+  • Jobber — Full Stack Developer (100)
+  • Clio — Backend Engineer (83)
+```
+
+**Two filters do the cheap work** so the gate does not have to. A title filter keeps only the
+three shapes — deliberately wide, because the score gate is the real defence and a title wrongly
+excluded here is a job never seen at all. A location filter keeps Canada and unqualified remote,
+and drops the rest; Cohere's board lists San Francisco and London roles that are not this search.
+
+Ambiguous city names get their own handling: **London is a real Ontario city** and a much more
+famous English one, so a bare "London" on a Canadian company's board resolves to Ontario while
+"London, UK" does not. Same for Sydney, Nova Scotia.
+
+**Board readers are written to survive drift.** Every field lists the keys it might appear
+under and the first present wins, so a vendor renaming `absolute_url` to `url` costs one entry
+in a list rather than a 2am crash — and a posting missing its apply URL is dropped rather than
+half-saved. The shapes come from the vendors' documented board APIs; **confirm them on the first
+real run**, which is also the first time this machine can reach those hosts.
+
+Ties in the nightly ranking break toward the posting with more matched requirements: two jobs at
+100% coverage are not equally good bets when one named two things you have and the other named
+seven.
+
+```cron
+0 2 * * * cd /srv/tracker && .venv/bin/python -m discover.crawl --tailor-top 5
+30 7 * * * cd /srv/tracker && .venv/bin/python -m inbox.run --sync --ghost --digest
+```
+
 ## Who to watch
 
 `discover/watchlist.yaml` holds 50 Canadian employers that hire Python, AI and backend

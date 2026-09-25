@@ -131,7 +131,7 @@ up, and the sweep already reports which items warrant one.
 
 ---
 
-## Phase 5 — Discovery (~1 week)
+## Phase 5 — Discovery — **done**
 
 - Canadian company watchlist with detected `ats_type`, seeded from the Toronto, Waterloo,
   Montreal and Vancouver tech and AI ecosystems.
@@ -143,7 +143,11 @@ up, and the sweep already reports which items warrant one.
 - Upsert on `dedupe_key`; score everything; queue the top N for tailoring.
 - Digest section: "new, scored above threshold, tailored and ready."
 
-**Done when:** you wake up to five apply-ready packets you did not have to find.
+**Done:** board readers for Greenhouse, Lever, Ashby, Workable, SmartRecruiters and
+Recruitee with drift-tolerant field mapping; title and location filters; capture through the
+same deduplicating path as the extension; scoring and gating on everything new; and resumes
+rendered for the best-scoring jobs of the night. Job Bank remains unwired — its feed format
+needs confirming from a machine that can reach it.
 
 ---
 

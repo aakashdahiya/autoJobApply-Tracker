@@ -319,12 +319,11 @@ def mark_submitted(
 
 def _score_job(job: Job):
     """Analyse a stored description and score it against the fact bank."""
-    from tailor.cache import analyse_cached
-    from tailor.score import score as score_profile
+    from tailor.pipeline import analyse_and_score
 
     profile = load_profile_cached()
-    jd = analyse_cached(job.description_raw or "", job.description_hash)
-    return profile, jd, score_profile(profile, jd)
+    jd, result = analyse_and_score(profile, job)
+    return profile, jd, result
 
 
 def _score_out(job: Job, jd, result) -> ScoreOut:
@@ -353,20 +352,10 @@ def score_job(job_id: int, session: Session = Depends(get_session)) -> ScoreOut:
     if not (job.description_raw or "").strip():
         raise HTTPException(409, "no description captured for this job")
 
+    from tailor.pipeline import record_score
+
     _profile, jd, result = _score_job(job)
-    application = job.application
-    application.match_score = result.total
-    application.shape = result.shape.value
-    store.log(session, application, "scored", "api", {
-        "total": result.total, "shape": result.shape.value,
-        "reason": result.reason, "gaps": result.gaps,
-    })
-    if not result.passes:
-        store.set_status(session, application, Status.skipped, source="score-gate",
-                         note=result.reason)
-    elif application.status is Status.discovered:
-        store.set_status(session, application, Status.scored, source="score-gate")
-    session.commit()
+    record_score(session, job, result)
     return _score_out(job, jd, result)
 
 
@@ -378,13 +367,7 @@ def tailor_job(
     session: Session = Depends(get_session),
 ) -> TailorOut:
     """Score, gate, then render a resume aimed at this posting."""
-    from pathlib import Path
-
-    from resume.docx_render import render_docx
-    from resume.select import select
-    from resume.typst_render import render_pdf
-    from resume.verify import check_selection
-    from tailor.rephrase import rephrase
+    from tailor.pipeline import record_score, tailor as run_tailor
 
     job = session.get(Job, job_id)
     if job is None:
@@ -393,47 +376,21 @@ def tailor_job(
         raise HTTPException(409, "no description captured for this job")
 
     profile, jd, result = _score_job(job)
-    application = job.application
-    application.match_score = result.total
-    application.shape = result.shape.value
-
     if not result.passes and not force:
-        store.set_status(session, application, Status.skipped, source="score-gate",
-                         note=result.reason)
-        session.commit()
+        record_score(session, job, result)
         return TailorOut(job_id=job.id, score=_score_out(job, jd, result), tailored=False,
                          note=f"below threshold: {result.reason}")
 
-    selection = select(profile, result.shape)
-    note, rephrased = "", 0
-    if use_model:
-        rewritten = rephrase(
-            profile, selection,
-            target_terms=sorted(jd.required | jd.preferred),
-            title=job.title,
-        )
-        selection, note, rephrased = rewritten.selection, rewritten.note, rewritten.changed
-
-    problems = check_selection(profile, selection, strict=not use_model)
-    if problems:
-        raise HTTPException(409, f"traceability failed: {problems[0]}")
-
-    stem = f"{profile.identity.name.replace(' ', '_')}_{job.company.name_norm.replace(' ', '_')}"
-    pdf = render_pdf(profile, selection, Path("data/resumes") / f"{stem}.pdf")
-    docx = render_docx(profile, selection, Path("data/resumes") / f"{stem}.docx")
-
-    application.resume_path = str(pdf)
-    store.log(session, application, "tailored", "api", {
-        "shape": result.shape.value, "score": result.total,
-        "rephrased": rephrased, "resume": str(pdf),
-    })
-    if application.status in {Status.discovered, Status.scored}:
-        store.set_status(session, application, Status.tailored, source="tailor")
-    session.commit()
+    job.application.match_score = result.total
+    job.application.shape = result.shape.value
+    outcome = run_tailor(session, profile, job, jd, result, use_model=use_model)
+    if not outcome.tailored:
+        raise HTTPException(409, outcome.note)
 
     return TailorOut(
         job_id=job.id, score=_score_out(job, jd, result), tailored=True,
-        resume_path=str(pdf), docx_path=str(docx), rephrased=rephrased, note=note,
+        resume_path=outcome.resume_path, docx_path=outcome.docx_path,
+        rephrased=outcome.rephrased, note=outcome.note,
     )
 
 
