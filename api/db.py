@@ -9,6 +9,7 @@ from pathlib import Path
 
 from sqlalchemy import (
     JSON, Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text, create_engine,
+    inspect, text,
 )
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
@@ -138,6 +139,10 @@ class EmailLink(Base):
     deadline_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
     extracted: Mapped[dict | None] = mapped_column(JSON)
     reviewed: Mapped[bool] = mapped_column(Boolean, default=False)
+    # When the instant push for this message actually went out. Null means it
+    # still owes one, so a push that failed is retried on the next sweep rather
+    # than being lost behind the message's own idempotency key.
+    notified_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
 
 
@@ -216,7 +221,30 @@ def make_engine(url: str | None = None):
         kwargs["poolclass"] = StaticPool
     engine = create_engine(url, **kwargs)
     Base.metadata.create_all(engine)
+    _add_missing_columns(engine)
     return engine
+
+
+# Columns added after the first release. `create_all` creates missing tables but
+# never alters an existing one, so a database made before a column existed would
+# otherwise keep failing every query that mentions it. Alembic is the eventual
+# answer; until then this runs the one additive step SQLite needs, and skips it
+# the moment the column is there.
+_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    ("email_links", "notified_at", "DATETIME"),
+)
+
+
+def _add_missing_columns(engine) -> None:
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    for table, column, sql_type in _ADDED_COLUMNS:
+        if table not in tables:
+            continue
+        if column in {c["name"] for c in inspector.get_columns(table)}:
+            continue
+        with engine.begin() as connection:
+            connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}"))
 
 
 def make_session_factory(engine):

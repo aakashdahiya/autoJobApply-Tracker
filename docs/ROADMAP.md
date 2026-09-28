@@ -129,8 +129,14 @@ is honest about what is missing rather than papering over it.
 **Done:** rule-based classification with quoted-history stripping, deadline extraction,
 domain/name/title matching with an explicit orphan bucket, forward-only status movement,
 21-day ghosting, and a digest that leads with whatever is time-critical. Gmail access is
-read-only and incremental; the transport for an instant push is the one piece still to wire
-up, and the sweep already reports which items warrant one.
+read-only and incremental.
+
+Instant pushes are wired up too: `interview_invite`, `assessment` and `offer` go out the moment
+a sweep sees them, over Telegram, email, or a console transport that needs no account. Delivery
+is stamped on the email row, so a re-run never pings you twice and a push that failed is still
+owed — the case that matters, because the message's own idempotency key means triage would
+otherwise never look at it again. An undelivered push exits non-zero so cron notices a broken
+transport rather than reporting success while you hear nothing.
 
 ---
 

@@ -416,9 +416,23 @@ def inbox_sync(session: Session = Depends(get_session)) -> SyncOut:
             "`python -m inbox.run --sync` once to complete the OAuth consent.",
         )
     report = run_sync(session, GmailSource(service))
+
+    # Triage is already committed, so a transport that is down must not fail
+    # the request — the rows stay pending and the next sweep owes them again.
+    # It is still reported as owed rather than as zero, which would read as
+    # "nothing needed sending".
+    from inbox.notify import PushFailed, pending, push_pending
+
+    try:
+        pushed = push_pending(session)
+        sent, failed = pushed.sent, pushed.failed
+    except PushFailed:
+        sent, failed = 0, len(pending(session))
+
     return SyncOut(
         seen=report.seen, linked=report.linked, orphans=report.orphans,
         duplicates=report.duplicates, moved=report.moved, urgent=report.urgent,
+        pushed=sent, push_failed=failed,
     )
 
 

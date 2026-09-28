@@ -234,3 +234,38 @@ def test_scoring_a_job_with_no_description_is_a_clear_error(client):
     response = client.post(f"/jobs/{job_id}/score")
     assert response.status_code == 409
     assert "description" in response.json()["detail"]
+
+
+
+def test_an_unconfigured_transport_is_reported_as_owed_not_as_nothing(client, monkeypatch):
+    """`push_failed: 0` would read as "nothing needed sending", which is the
+    opposite of the truth when the transport is simply not set up."""
+    import inbox.notify as notify_module
+    import inbox.sync as sync_module
+    from inbox.sync import Message
+
+    urgent = Message(
+        id="m-urgent", sender="ta@cohere.com",
+        subject="Your online assessment", body="Complete the assessment within 72 hours.",
+    )
+
+    class FakeSource:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def fetch(self, cursor):
+            return [urgent], "cursor-1"
+
+    def unconfigured(*args, **kwargs):
+        raise notify_module.PushFailed("JOB_TRACKER_NOTIFY=telegram needs TELEGRAM_BOT_TOKEN")
+
+    monkeypatch.setattr(sync_module, "build_gmail_service", lambda *a, **k: object())
+    monkeypatch.setattr(sync_module, "GmailSource", FakeSource)
+    monkeypatch.setattr(notify_module, "push_pending", unconfigured)
+
+    body = client.post("/inbox/sync").json()
+
+    assert body["seen"] == 1
+    assert body["urgent"], "an assessment should have been flagged urgent"
+    assert body["pushed"] == 0
+    assert body["push_failed"] == 1, "an owed push reported as zero reads as nothing owed"

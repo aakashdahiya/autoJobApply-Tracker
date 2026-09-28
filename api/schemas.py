@@ -189,6 +189,8 @@ class SyncOut(BaseModel):
     duplicates: int
     moved: list[str]
     urgent: list[str]
+    pushed: int = 0
+    push_failed: int = 0
 
 
 class DigestOut(BaseModel):

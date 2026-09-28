@@ -22,6 +22,7 @@ from sqlalchemy import select
 from api.db import Application, EmailLink, Status, SyncState, utcnow
 from api.store import log, set_status
 from inbox.classify import triage
+from inbox.digest import URGENT_KINDS
 from inbox.match import match_email
 
 # Which status a classification implies.
@@ -160,7 +161,7 @@ def sync(session, source: MessageSource, *, source_name: str = "gmail") -> SyncR
         if outcome == "moved" and link is not None:
             application = session.get(Application, link.application_id)
             report.moved.append(f"{application.job.company.name} — {application.status.value}")
-        if link is not None and link.classification in {"offer", "assessment", "interview_invite"}:
+        if link is not None and link.classification in URGENT_KINDS:
             when = f" (due {link.deadline_at:%d %b %H:%M})" if link.deadline_at else ""
             report.urgent.append(f"{link.classification}: {link.subject}{when}")
 

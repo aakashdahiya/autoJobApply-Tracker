@@ -209,7 +209,45 @@ curl -X PATCH http://127.0.0.1:8765/email-links/3 \
 
 Later messages in that thread inherit the match, so it is genuinely once per conversation.
 
-### 13. Connect the sheet
+### 13. Turn on instant pushes
+
+The digest is once a day. An assessment with a 72-hour window cannot wait for it, so
+`interview_invite`, `assessment` and `offer` are pushed the moment a sweep sees them.
+
+Nothing is required to start: the default transport prints the push, which is enough to see
+what you would have been sent. To get it on your phone, make a Telegram bot with
+[@BotFather](https://t.me/botfather), send it one message, and read your chat id from
+`https://api.telegram.org/bot<TOKEN>/getUpdates`:
+
+```bash
+export JOB_TRACKER_NOTIFY=telegram
+export TELEGRAM_BOT_TOKEN=123456:AA...
+export TELEGRAM_CHAT_ID=987654321
+.venv/bin/python -m inbox.run --notify
+```
+
+Email works too, if a bot is more setup than you want:
+
+```bash
+export JOB_TRACKER_NOTIFY=email
+export NOTIFY_SMTP_HOST=smtp.gmail.com   # NOTIFY_SMTP_PORT defaults to 587
+export NOTIFY_SMTP_USER=you@gmail.com    # an app password, not your login
+export NOTIFY_SMTP_PASSWORD=...
+export NOTIFY_EMAIL_TO=you@gmail.com
+```
+
+**Expect:** one message per urgent email, deadline first. Two behaviours worth knowing:
+
+- **You are pinged once.** A re-run of the sweep does not ping you again about an email you
+  already read. Delivery is stamped on the row, not inferred.
+- **A failed push is still owed.** If the transport is down, the row stays pending and the next
+  sweep sends it. `--notify` on its own flushes the backlog, and exits non-zero while anything
+  is still undelivered — so cron tells you the transport is broken instead of reporting success
+  every night while you hear nothing.
+
+Use `--no-notify` with `--sync` to triage a backlog quietly without a burst of pings.
+
+### 14. Connect the sheet
 
 Create a blank Google Sheet. Copy the id out of its URL —
 `docs.google.com/spreadsheets/d/`**`THIS PART`**`/edit`.
@@ -236,6 +274,8 @@ and add authentication to the API as part of that move, not after it.
 0  2 * * * cd /srv/tracker && .venv/bin/python -m discover.crawl --tailor-top 5
 15 2 * * * cd /srv/tracker && .venv/bin/python -m sheets.run --spreadsheet $TRACKER_SPREADSHEET_ID
 30 7 * * * cd /srv/tracker && .venv/bin/python -m inbox.run --sync --ghost --digest
+# Sweeping hourly is what makes a push instant; the 07:30 run is the digest.
+0  * * * * cd /srv/tracker && .venv/bin/python -m inbox.run --sync
 ```
 
 ---
