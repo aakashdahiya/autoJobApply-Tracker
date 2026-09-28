@@ -2,7 +2,7 @@ Metadata-Version: 2.4
 Name: autojobapply-tracker
 Version: 0.1.0
 Summary: Semi-automated job application system for Canadian AI/tech/Python roles
-Requires-Python: >=3.11
+Requires-Python: >=3.10
 Requires-Dist: pydantic>=2.0
 Requires-Dist: pyyaml>=6.0
 Requires-Dist: typst>=0.11
@@ -14,6 +14,7 @@ Requires-Dist: sqlalchemy>=2.0
 Requires-Dist: keyring>=24.0
 Provides-Extra: dev
 Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: httpx2>=0.28; extra == "dev"
 Provides-Extra: llm
 Requires-Dist: anthropic>=0.40; extra == "llm"
 Provides-Extra: gmail

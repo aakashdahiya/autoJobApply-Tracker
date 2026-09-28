@@ -5,7 +5,7 @@ them the system already saves you time. Parts 3 to 5 can wait for a weekend.
 
 Each step says what to run, what you should see, and what to do when it does not.
 
-**You need:** Python 3.11+, Chrome, and a Google account. Total hands-on time is about an hour,
+**You need:** Python 3.10+, Chrome, and a Google account. Total hands-on time is about an hour,
 most of it in Part 4 clicking through Google's console.
 
 ---
@@ -260,4 +260,7 @@ that is the most useful thing the system will tell you.
 | A sheet edit reverted | You edited a read-only column | Only Status and Notes travel back |
 | Gmail or Sheets refuses consent | Test user not added while in testing mode | Add your address under test users |
 | `pip install -e .` fails | Old checkout without the explicit package list | `git pull` |
+| `requires a different Python: 3.10.x not in '>=3.11'` | Old checkout; the floor is now 3.10 | `git pull` |
+| pip downloads pytest versions one by one for minutes | Its resolver is backtracking against an unsatisfiable constraint — usually the Python floor above | Ctrl+C is safe; `git pull`, then `pip install -U pip` |
+| `starlette.testclient module requires httpx2` | Old checkout; `[dev]` now installs it | `git pull && pip install -e ".[dev]"` |
 | Old database, new columns | No migrations yet | Delete `data/tracker.sqlite` and re-capture |

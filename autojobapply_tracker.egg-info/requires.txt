@@ -10,6 +10,7 @@ keyring>=24.0
 
 [dev]
 pytest>=8.0
+httpx2>=0.28
 
 [gmail]
 google-api-python-client>=2.100

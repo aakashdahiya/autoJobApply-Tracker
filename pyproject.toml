@@ -2,7 +2,7 @@
 name = "autojobapply-tracker"
 version = "0.1.0"
 description = "Semi-automated job application system for Canadian AI/tech/Python roles"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.0",
     "pyyaml>=6.0",
@@ -16,7 +16,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+# httpx2 is what starlette's TestClient needs; without it the API tests
+# cannot even be collected on a clean machine.
+dev = ["pytest>=8.0", "httpx2>=0.28"]
 # Only needed for `--rephrase`. Everything else runs without a model.
 llm = ["anthropic>=0.40"]
 # Only needed to read your inbox. Triage itself is testable without it.
