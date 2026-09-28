@@ -39,6 +39,14 @@ and never reaches the repository. Three things matter more than the rest:
 - **`constraints.work_auth_expiry`** — your PGWP end date.
 - **`identity.postal_code` and `street`** — application forms ask; the resume never shows them.
 
+Every command below looks for `profile.yaml` in the working directory. Set `JOB_TRACKER_PROFILE`
+to an absolute path to keep the fact bank somewhere else — useful on the Phase 4 VPS, where the
+checkout is redeployed but your history should not be:
+
+```bash
+export JOB_TRACKER_PROFILE=/etc/job-tracker/profile.yaml
+```
+
 ### 3. Prove it renders
 
 ```bash

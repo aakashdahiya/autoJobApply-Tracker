@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 from resume.docx_render import render_docx
-from resume.loader import load_profile
+from resume.loader import default_profile_path, load_profile
 from resume.select import select
 from resume.typst_render import render_pdf
 from resume.verify import check_selection, verify_pdf
@@ -22,7 +22,7 @@ from tailor.score import DEFAULT_THRESHOLD, score
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="tailor.run", description=__doc__)
-    ap.add_argument("--profile", default="profile.yaml")
+    ap.add_argument("--profile", default=default_profile_path())
     ap.add_argument("--jd", required=True, help="path to the job description text")
     ap.add_argument("--title", default="", help="job title, for the rephrasing prompt")
     ap.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD)

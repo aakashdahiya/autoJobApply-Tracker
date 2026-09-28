@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -44,3 +45,16 @@ def load_profile(path: str | Path) -> Profile:
     if not isinstance(raw, dict):
         raise ValueError(f"{path}: expected a YAML mapping at the top level")
     return Profile.model_validate(raw)
+
+
+def default_profile_path() -> str:
+    """Where the fact bank lives, unless a caller says otherwise.
+
+    `profile.yaml` sits beside the code and is gitignored, which is right for a
+    file full of personal history but wrong as the only possible location: the
+    server has to run from a checkout that has one, and the tests would need a
+    copy of your real profile to pass. `JOB_TRACKER_PROFILE` overrides it, so a
+    deployment can keep the fact bank outside the checkout and the suite can
+    point at `profile.example.yaml`.
+    """
+    return os.environ.get("JOB_TRACKER_PROFILE") or "profile.yaml"

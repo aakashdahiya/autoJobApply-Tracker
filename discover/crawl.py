@@ -23,6 +23,7 @@ from api.store import capture_job
 from discover.boards import BOARDS, fetch_board
 from discover.detect import DELAY_SECONDS, fetch_json
 from discover.filters import keep
+from resume.loader import default_profile_path
 
 
 @dataclass
@@ -63,12 +64,12 @@ def crawl(
     per_board: int | None = None,
     tailor_top: int = 0,
     use_model: bool = False,
-    profile_path: str = "profile.yaml",
+    profile_path: str | None = None,
 ) -> CrawlReport:
     from resume.loader import load_profile
     from tailor.pipeline import analyse_and_score, record_score, tailor as run_tailor
 
-    profile = load_profile(profile_path)
+    profile = load_profile(profile_path or default_profile_path())
     report = CrawlReport(companies=len(companies))
     candidates: list[tuple[float, int, object]] = []
 
@@ -140,7 +141,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="discover.crawl", description=__doc__)
     ap.add_argument("--detected", default="discover/detected.yaml",
                     help="output of `python -m discover.detect`")
-    ap.add_argument("--profile", default="profile.yaml")
+    ap.add_argument("--profile", default=default_profile_path())
     ap.add_argument("--only", help="substring filter on company name")
     ap.add_argument("--per-board", type=int, help="cap postings read per company")
     ap.add_argument("--tailor-top", type=int, default=0,

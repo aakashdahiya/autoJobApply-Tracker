@@ -157,14 +157,18 @@ def stats(session: Session = Depends(get_session)) -> Stats:
 _profile_cache: dict = {}
 
 
-def load_profile_cached(path: str = "profile.yaml"):
+def load_profile_cached(path: str | None = None):
     """Reload when the file changes, so editing the fact bank takes effect
-    without restarting the server."""
+    without restarting the server.
+
+    Keyed on the path as well as the mtime: two profiles can share a timestamp,
+    and serving one under the other's name would be silent and wrong."""
     from pathlib import Path
 
-    from resume.loader import load_profile
+    from resume.loader import default_profile_path, load_profile
 
-    stamp = Path(path).stat().st_mtime
+    path = path or default_profile_path()
+    stamp = (path, Path(path).stat().st_mtime)
     if _profile_cache.get("stamp") != stamp:
         _profile_cache.update(stamp=stamp, profile=load_profile(path))
     return _profile_cache["profile"]

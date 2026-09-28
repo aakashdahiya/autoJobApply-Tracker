@@ -12,7 +12,7 @@ import argparse
 import sys
 
 from resume.docx_render import render_docx
-from resume.loader import load_profile
+from resume.loader import default_profile_path, load_profile
 from resume.schema import Shape
 from resume.select import depth_report, select, skills_without_evidence
 from resume.typst_render import render_pdf
@@ -21,7 +21,7 @@ from resume.verify import check_selection, reading_order_risks, verify_pdf
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="resume.render", description=__doc__)
-    ap.add_argument("--profile", default="profile.yaml")
+    ap.add_argument("--profile", default=default_profile_path())
     ap.add_argument("--shape", type=Shape, choices=list(Shape))
     ap.add_argument("--out", help="output PDF path")
     ap.add_argument("--docx", help="also write DOCX here")
