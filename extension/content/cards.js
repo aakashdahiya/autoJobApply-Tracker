@@ -42,33 +42,37 @@
     {
       name: "linkedin",
       matches: (host) => host.includes("linkedin.com"),
+      // The one hook worth trusting: a job link is how the product routes, so
+      // it outlives every class name around it.
+      link: 'a[href*="/jobs/view/"]',
       cards: [
         "li[data-occludable-job-id]",
         "div[data-job-id]",
+        "li.scaffold-layout__list-item",
         "li.jobs-search-results__list-item",
         "div.job-card-container",
+        "div.job-card-job-posting-card-wrapper",
       ],
-      read: (card) => ({
-        title: firstText(card, [
-          ".job-card-list__title--link",
-          ".job-card-list__title",
-          "a.job-card-container__link",
-          ".artdeco-entity-lockup__title",
-          "h3",
-        ]),
-        company: firstText(card, [
-          ".job-card-container__primary-description",
-          ".artdeco-entity-lockup__subtitle",
-          ".job-card-container__company-name",
-          "h4",
-        ]),
-        location: firstText(card, [
-          ".job-card-container__metadata-item",
-          ".artdeco-entity-lockup__caption",
-          ".job-card-container__metadata-wrapper",
-        ]),
-        url: cardUrl(card, "a.job-card-container__link, a.job-card-list__title--link, a[href*='/jobs/view/']"),
-      }),
+      titles: [
+        ".job-card-list__title--link",
+        ".job-card-list__title",
+        "a.job-card-container__link",
+        ".artdeco-entity-lockup__title",
+        "h3",
+      ],
+      companies: [
+        ".job-card-container__primary-description",
+        ".artdeco-entity-lockup__subtitle",
+        ".job-card-container__company-name",
+        "h4",
+      ],
+      locations: [
+        ".job-card-container__metadata-item",
+        ".artdeco-entity-lockup__caption",
+        ".job-card-container__metadata-wrapper",
+      ],
+      idAttrs: ["data-occludable-job-id", "data-job-id"],
+      idUrl: (id) => `https://www.linkedin.com/jobs/view/${id}/`,
       anchor: (card) =>
         card.querySelector(".job-card-container__metadata-wrapper") ||
         card.querySelector(".artdeco-entity-lockup__content") ||
@@ -77,48 +81,136 @@
     {
       name: "indeed",
       matches: (host) => host.includes("indeed.com"),
-      cards: ["div.job_seen_beacon", "div[data-jk]", "td.resultContent"],
-      read: (card) => ({
-        title: firstText(card, [
-          "h2.jobTitle span[title]",
-          "h2.jobTitle",
-          "a.jcs-JobTitle",
-          "h2",
-        ]),
-        company: firstText(card, [
-          '[data-testid="company-name"]',
-          "span.companyName",
-          ".company_location [data-testid='company-name']",
-        ]),
-        location: firstText(card, [
-          '[data-testid="text-location"]',
-          "div.companyLocation",
-          ".company_location [data-testid='text-location']",
-        ]),
-        url: cardUrl(card, "h2.jobTitle a, a.jcs-JobTitle, a[data-jk]"),
-      }),
+      link: 'a[href*="jk="], a[data-jk], a.jcs-JobTitle',
+      cards: ["div.job_seen_beacon", "div[data-jk]", "td.resultContent", "li div[data-jk]"],
+      titles: ["h2.jobTitle span[title]", "h2.jobTitle", "a.jcs-JobTitle", "h2"],
+      companies: [
+        '[data-testid="company-name"]',
+        "span.companyName",
+        ".company_location [data-testid='company-name']",
+      ],
+      locations: [
+        '[data-testid="text-location"]',
+        "div.companyLocation",
+        ".company_location [data-testid='text-location']",
+      ],
+      idAttrs: ["data-jk"],
+      idUrl: (id) => `https://${location.hostname}/viewjob?jk=${id}`,
       anchor: (card) => card.querySelector("h2.jobTitle") || card,
     },
   ];
 
-  function cardUrl(card, selector) {
-    const link = card.querySelector(selector);
-    if (link && link.getAttribute("href")) {
+  // --- finding the repeating unit -----------------------------------------
+
+  // Climb from a job link until the parent holds more than one of them: that
+  // parent is the list, so the node below it is one card. Works out the card
+  // boundary from the page's own structure rather than from a class name,
+  // which is the part that keeps changing.
+  function cardFor(link, pattern) {
+    let node = link;
+    for (let depth = 0; depth < 10 && node.parentElement; depth += 1) {
+      const parent = node.parentElement;
+      if (parent.querySelectorAll(pattern).length > 1) return node;
+      node = parent;
+    }
+    return node;
+  }
+
+  function cardsIn(root, site) {
+    const found = new Set();
+
+    // 1. Anchor-driven, the durable path.
+    if (site.link) {
+      const scope = root.querySelectorAll ? root : document;
+      const links = [
+        ...(root.matches && root.matches(site.link) ? [root] : []),
+        ...scope.querySelectorAll(site.link),
+      ];
+      for (const link of links) found.add(cardFor(link, site.link));
+    }
+
+    // 2. Known containers, for a card whose link has not rendered yet.
+    const selector = site.cards.join(",");
+    for (const node of [
+      ...(root.matches && root.matches(selector) ? [root] : []),
+      ...(root.querySelectorAll ? root.querySelectorAll(selector) : []),
+    ]) {
+      found.add(node);
+    }
+
+    // Drop any candidate that contains another: only the innermost is a card.
+    const cards = [...found];
+    return cards.filter((card) => !cards.some((other) => other !== card && card.contains(other)));
+  }
+
+  // --- reading one ---------------------------------------------------------
+
+  // Last resort, when every class name has been renamed: read the card the way
+  // you do. Both sites stack title, then company, then location.
+  //
+  // Lines come from the element tree, not from `innerText`: innerText depends
+  // on layout, which makes it both slow and untestable, and the block
+  // structure is what actually separates the fields here.
+  const BLOCK = new Set([
+    "div", "p", "li", "ul", "ol", "section", "article", "header", "footer",
+    "h1", "h2", "h3", "h4", "h5", "h6", "tr", "td", "th", "dl", "dt", "dd", "br",
+  ]);
+
+  const NOISE =
+    /^(easy apply|promoted|viewed|new|save|saved|applied|·|actively reviewing applicants|be an early applicant|\d+ (school )?alumni work here|\d+ (days?|weeks?|hours?|months?) ago)$/i;
+
+  function textLines(card) {
+    const lines = [];
+    const push = (value) => {
+      const line = clean(value);
+      if (!line || line.length > 140) return;
+      if (NOISE.test(line)) return;
+      if (lines[lines.length - 1] === line) return; // repeated for screen readers
+      lines.push(line);
+    };
+
+    const walk = (element) => {
+      let buffer = "";
+      for (const child of element.childNodes) {
+        if (child.nodeType === 3) {
+          buffer += child.nodeValue;
+          continue;
+        }
+        if (child.nodeType !== 1) continue;
+        const tag = child.tagName.toLowerCase();
+        if (tag === "button" || tag === "svg" || tag === "style" || tag === "script") continue;
+        if (BLOCK.has(tag)) {
+          push(buffer);
+          buffer = "";
+          walk(child);
+        } else {
+          buffer += child.textContent || "";
+        }
+      }
+      push(buffer);
+    };
+
+    walk(card);
+    return lines;
+  }
+
+  function cardUrl(card, site) {
+    const link = card.matches(site.link) ? card : card.querySelector(site.link);
+    const href = link && link.getAttribute("href");
+    if (href) {
       try {
-        return new URL(link.getAttribute("href"), location.origin).href;
+        return new URL(href, location.origin).href;
       } catch {
-        return "";
+        /* fall through to the id */
       }
     }
-    // Indeed keys every card by `data-jk`, which is enough to rebuild the URL
-    // even when the anchor is missing.
-    const jk = card.getAttribute("data-jk") || (card.closest("[data-jk]") || {}).getAttribute?.("data-jk");
-    if (jk && location.hostname.includes("indeed.com")) {
-      return `https://${location.hostname}/viewjob?jk=${jk}`;
-    }
-    const jobId = card.getAttribute("data-occludable-job-id") || card.getAttribute("data-job-id");
-    if (jobId && location.hostname.includes("linkedin.com")) {
-      return `https://www.linkedin.com/jobs/view/${jobId}/`;
+    // Both sites key a card by its job id, which rebuilds the URL even when the
+    // anchor has not rendered.
+    for (const attr of site.idAttrs) {
+      const holder = card.matches(`[${attr}]`) ? card : card.querySelector(`[${attr}]`)
+        || card.closest(`[${attr}]`);
+      const id = holder && holder.getAttribute(attr);
+      if (id) return site.idUrl(id);
     }
     return "";
   }
@@ -126,13 +218,27 @@
   // Exposed for the tests: reading a card is the brittle part, and it is pure.
   function readCard(card, siteName) {
     const site = SITES.find((s) => s.name === siteName);
-    if (!site) return null;
-    const read = site.read(card);
+    if (!site || !card) return null;
+
+    let title = firstText(card, site.titles);
+    let company = firstText(card, site.companies);
+    let place = firstText(card, site.locations);
+
+    // Every class name renamed at once: fall back to reading the card as laid
+    // out. Only for the fields still missing, so a partial rename degrades
+    // rather than throwing everything away.
+    if (!title || !company) {
+      const lines = textLines(card);
+      title = title || lines[0] || "";
+      company = company || lines.find((line) => line !== title) || "";
+      place = place || lines.find((line) => line !== title && line !== company) || "";
+    }
+
     const payload = {
-      title: read.title,
-      company: read.company,
-      locations: read.location ? [read.location] : [],
-      apply_url: read.url || location.href,
+      title,
+      company,
+      locations: place ? [place] : [],
+      apply_url: cardUrl(card, site) || location.href,
       source: site.name,
       ats_type: site.name,
     };
@@ -205,12 +311,7 @@
   }
 
   function inject(root) {
-    const selector = site.cards.join(",");
-    const cards = [
-      ...(root.matches && root.matches(selector) ? [root] : []),
-      ...(root.querySelectorAll ? root.querySelectorAll(selector) : []),
-    ];
-    for (const card of cards) {
+    for (const card of cardsIn(root, site)) {
       if (card.getAttribute(MARK)) continue;
       card.setAttribute(MARK, "1");
       const anchor = site.anchor(card) || card;

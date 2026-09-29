@@ -169,3 +169,76 @@ test("does nothing on a site it does not know", () => {
   );
   assert.equal(dom.window.document.querySelectorAll(".job-tracker-star").length, 0);
 });
+
+// --- surviving a rename -----------------------------------------------------
+//
+// The first version of this matched LinkedIn's class names and found nothing on
+// a real results page, because those names had moved. These fix the behaviour
+// that actually matters: the card is located from the job link, which is the
+// product's own routing and does not get renamed.
+
+const LINKEDIN_RENAMED = `
+  <ul class="totally-new-list-class">
+    <li class="whatever-they-call-it-now">
+      <div><a href="/jobs/view/4012345678/"><strong>AI Engineer</strong></a>
+      <div>Sun Life</div><div>Toronto, ON</div></div>
+    </li>
+    <li class="whatever-they-call-it-now">
+      <div><a href="/jobs/view/4099999999/"><strong>Python Developer</strong></a>
+      <div>Lorven Technologies Inc.</div><div>Toronto, ON</div></div>
+    </li>
+  </ul>`;
+
+test("finds LinkedIn cards when every class name has changed", () => {
+  const dom = load(LINKEDIN_RENAMED, LINKEDIN);
+  assert.equal(
+    dom.window.document.querySelectorAll(".job-tracker-star").length,
+    2,
+    "cards are located from the job link, not from class names"
+  );
+});
+
+test("reads a renamed LinkedIn card by its layout", () => {
+  const dom = load(LINKEDIN_RENAMED, LINKEDIN);
+  const link = dom.window.document.querySelector('a[href*="/jobs/view/4012345678"]');
+  const card = link.closest("li");
+  const job = JSON.parse(JSON.stringify(dom.window.__jobTrackerReadCard(card, "linkedin")));
+
+  assert.equal(job.ok, true);
+  assert.equal(job.title, "AI Engineer");
+  assert.equal(job.company, "Sun Life");
+  assert.equal(job.apply_url, "https://www.linkedin.com/jobs/view/4012345678/");
+});
+
+test("the list itself is never mistaken for a card", () => {
+  const dom = load(LINKEDIN_RENAMED, LINKEDIN);
+  const list = dom.window.document.querySelector("ul");
+  assert.equal(
+    list.getAttribute("data-job-tracker"),
+    null,
+    "a container holding several job links is the list, not a card"
+  );
+});
+
+test("noise on the card is not read as the company", () => {
+  const dom = load(
+    `<li><div><a href="/jobs/view/1"><strong>AI Engineer</strong></a>
+     <div>Easy Apply</div><div>Promoted</div><div>Guidepoint</div>
+     <div>Greater Toronto Area, Canada (Hybrid)</div></div></li>`,
+    LINKEDIN
+  );
+  const card = dom.window.document.querySelector("li");
+  const job = JSON.parse(JSON.stringify(dom.window.__jobTrackerReadCard(card, "linkedin")));
+  assert.equal(job.company, "Guidepoint", "LinkedIn's badges are chrome, not the employer");
+});
+
+test("finds Indeed cards when the classes have changed", () => {
+  const dom = load(
+    `<ul>
+       <li><a href="/viewjob?jk=aaa111"><span>Python Developer</span></a><div>Wealthsimple</div></li>
+       <li><a href="/viewjob?jk=bbb222"><span>Data Engineer</span></a><div>Clio</div></li>
+     </ul>`,
+    INDEED
+  );
+  assert.equal(dom.window.document.querySelectorAll(".job-tracker-star").length, 2);
+});
