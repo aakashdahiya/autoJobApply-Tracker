@@ -22,7 +22,22 @@ python3 -m venv .venv
 .venv/bin/python -m pytest -q
 ```
 
-**Expect:** `213 passed`. If tests fail here, stop — nothing downstream will behave.
+**Expect:** every test passing (253 at the time of writing). If tests fail here, stop — nothing downstream will behave.
+
+> Paste these one line at a time. zsh — the default shell on macOS — does not treat `#` as a
+> comment when you type it interactively, so a trailing comment becomes an argument and the
+> command fails in a confusing way.
+
+### 1b. Staying current
+
+```bash
+./scripts/update.sh
+```
+
+Pulls, reinstalls if the dependencies moved, runs both test suites, and reminds you of the
+three things it cannot do for you: reload the extension in Chrome, accept any new permission
+prompt, and hard-refresh open LinkedIn or Indeed tabs. It refuses to pull over uncommitted work
+rather than guessing what you wanted done with it.
 
 ### 2. Fill in your fact bank
 
