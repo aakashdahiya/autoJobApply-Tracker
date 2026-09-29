@@ -13,9 +13,18 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 root=$(pwd)
 
-say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
-warn() { printf '\033[33m%s\033[0m\n' "$*"; }
-die() { printf '\033[31m%s\033[0m\n' "$*" >&2; exit 1; }
+# Colour only for a human at a terminal. When this is piped -- into a log, or
+# into the launchd job's notification -- escape codes are noise, and a macOS
+# notification renders them as literal garbage.
+if [ -t 1 ]; then
+  bold=$'\033[1m'; yellow=$'\033[33m'; red=$'\033[31m'; off=$'\033[0m'
+else
+  bold=''; yellow=''; red=''; off=''
+fi
+
+say() { printf '\n%s%s%s\n' "$bold" "$*" "$off"; }
+warn() { printf '%s%s%s\n' "$yellow" "$*" "$off"; }
+die() { printf '%s%s%s\n' "$red" "$*" "$off" >&2; exit 1; }
 
 branch=$(git rev-parse --abbrev-ref HEAD)
 

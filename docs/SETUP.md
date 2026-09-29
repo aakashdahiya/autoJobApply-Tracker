@@ -39,6 +39,24 @@ three things it cannot do for you: reload the extension in Chrome, accept any ne
 prompt, and hard-refresh open LinkedIn or Indeed tabs. It refuses to pull over uncommitted work
 rather than guessing what you wanted done with it.
 
+To have it run on its own (macOS):
+
+```bash
+./scripts/install-autoupdate.sh
+./scripts/install-autoupdate.sh --status
+./scripts/install-autoupdate.sh --uninstall
+```
+
+A LaunchAgent that runs the same update hourly — `--interval 21600` for every six hours. It is
+silent when nothing changed, notifies you when an update lands, because Chrome will still be
+running the old extension until you reload it, and notifies you when it fails, because a
+background job that fails quietly is worse than none. The log is
+`~/Library/Logs/autojobapply-tracker-update.log`, and the most recent run alone is in the
+matching `.last` file.
+
+It still will not touch uncommitted work: if you have local edits it notifies and does nothing,
+rather than stashing your changes from a job you had forgotten about.
+
 ### 2. Fill in your fact bank
 
 ```bash
