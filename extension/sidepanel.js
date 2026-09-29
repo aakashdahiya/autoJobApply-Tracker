@@ -89,8 +89,104 @@ function jobCard(job) {
     row.append(button);
   }
 
+  if (!job.has_description) {
+    const warn = document.createElement("span");
+    warn.className = "note";
+    warn.textContent = "needs its description — open it once";
+    warn.title =
+      "Saved from a results card. Nothing can be scored or tailored until the " +
+      "posting itself has been read; open it and press Ctrl+Shift+S.";
+    row.append(warn);
+  } else if (!app.resume_path) {
+    const tailor = document.createElement("button");
+    tailor.textContent = "tailor";
+    tailor.title = "Write this job's resume in claude.ai";
+    tailor.addEventListener("click", () => runTailor(job, tailor));
+    row.append(tailor);
+  } else {
+    const resume = document.createElement("a");
+    resume.className = "resume";
+    resume.href = `${apiBase}/applications/${app.id}/resume.pdf`;
+    resume.target = "_blank";
+    resume.rel = "noreferrer";
+    resume.draggable = true;
+    resume.textContent = "resume ↓";
+    resume.title = "Open, or drag straight onto the employer's upload box";
+    row.append(resume);
+  }
+
   item.append(heading, meta, row);
   return item;
+}
+
+// Tailoring runs in a claude.ai tab, which is someone else's page and can
+// change under us. When the read-back fails the prompt comes back with the
+// error, so the work is never lost — paste it yourself and paste the reply in.
+async function runTailor(job, button) {
+  button.disabled = true;
+  button.textContent = "tailoring…";
+  const result = await chrome.runtime.sendMessage({ type: "tailor-in-chat", jobId: job.id });
+  button.disabled = false;
+  button.textContent = "tailor";
+
+  if (result && result.ok) {
+    const note = (result.result && result.result.note) || "";
+    if (note.startsWith("discarded")) {
+      // The resume is still valid — it fell back to your own wording. You
+      // should know the chat tried to change what a bullet claimed.
+      show(
+        `Resume ready for ${job.company}, but Claude's rewrite was thrown out: ${note}`,
+        true
+      );
+    } else {
+      show(`Resume ready for ${job.company} — ${job.title}.`);
+    }
+    await refresh();
+    return;
+  }
+
+  const error = (result && result.error) || "tailoring failed";
+  if (result && result.stage === "validate") {
+    // The fact bank refused the reply. That is the system working.
+    show(`Claude's reply was rejected: ${error}`, true);
+  } else {
+    show(`Could not drive claude.ai: ${error}`, true);
+  }
+  if (result && result.prompt) offerManualPaste(job, result.prompt);
+}
+
+function offerManualPaste(job, prompt) {
+  const box = $("manual");
+  box.hidden = false;
+  box.querySelector(".manual-title").textContent = `${job.company} — ${job.title}`;
+  const promptField = box.querySelector(".manual-prompt");
+  const replyField = box.querySelector(".manual-reply");
+  promptField.value = prompt;
+  replyField.value = "";
+
+  box.querySelector(".manual-copy").onclick = async () => {
+    await navigator.clipboard.writeText(prompt).catch(() => promptField.select());
+    show("Prompt copied. Paste it into claude.ai, then paste the reply back here.");
+  };
+  box.querySelector(".manual-submit").onclick = async () => {
+    const reply = replyField.value.trim();
+    if (!reply) return;
+    try {
+      await api(`/jobs/${job.id}/tailor-from-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reply }),
+      });
+      box.hidden = true;
+      show(`Resume ready for ${job.company} — ${job.title}.`);
+      await refresh();
+    } catch (error) {
+      show(String(error.message || error), true);
+    }
+  };
+  box.querySelector(".manual-close").onclick = () => {
+    box.hidden = true;
+  };
 }
 
 async function refresh() {

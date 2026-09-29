@@ -36,6 +36,25 @@
     </div>
 
     <p id="message" class="message" hidden></p>
+
+    <!-- Shown only when driving claude.ai failed. The prompt is already built,
+         so the work is never lost: copy it, paste the reply back. -->
+    <section id="manual" class="manual" hidden>
+      <h2 class="manual-title"></h2>
+      <p class="manual-help">
+        Could not read the reply out of claude.ai. Copy this prompt, paste it
+        there, then paste Claude's whole reply back below.
+      </p>
+      <textarea class="manual-prompt" rows="4" readonly></textarea>
+      <div class="manual-buttons">
+        <button class="manual-copy">Copy prompt</button>
+        <button class="manual-close">Close</button>
+      </div>
+      <textarea class="manual-reply" rows="5"
+                placeholder="Paste Claude's reply here…"></textarea>
+      <button class="manual-submit primary">Use this reply</button>
+    </section>
+
     <ul id="jobs" class="jobs"></ul>
 
     <script src="sidepanel.js"></script>

@@ -202,6 +202,19 @@ class SyncOut(BaseModel):
     push_failed: int = 0
 
 
+class TailorPromptOut(BaseModel):
+    job_id: int
+    title: str
+    company: str
+    shape: str
+    prompt: str
+    fact_ids: list[str]
+
+
+class ChatReplyIn(BaseModel):
+    reply: str = Field(min_length=1)
+
+
 class DigestOut(BaseModel):
     generated_at: dt.datetime
     urgent: list[dict]

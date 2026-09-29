@@ -66,3 +66,52 @@ button.primary.alt { background: transparent; color: var(--accent); }
   border: 1px solid var(--line); background: var(--bg); color: var(--fg);
 }
 .legend { color: var(--muted); font-size: 11px; margin: 6px 0 0; }
+
+
+/* Manual fallback for tailoring, shown only when the claude.ai read-back fails. */
+.manual {
+  margin: 8px 12px;
+  padding: 10px;
+  border: 1px solid #f0c000;
+  border-radius: 8px;
+  background: #fffbe9;
+}
+.manual h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+.manual-help {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #6b5900;
+}
+.manual textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  margin-bottom: 6px;
+}
+.manual-buttons {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+/* A tailored resume: openable, and draggable straight onto an upload box. */
+.resume {
+  font-size: 12px;
+  text-decoration: none;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid #0a66c2;
+  color: #0a66c2;
+}
+.resume:hover { background: #eef3f8; }
+
+.note {
+  font-size: 11px;
+  color: #8a6d00;
+  background: #fffbe9;
+  border-radius: 10px;
+  padding: 2px 8px;
+}

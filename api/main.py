@@ -21,9 +21,11 @@ from api import autofill, vault
 from api.autofill import FieldSpec
 from api.schemas import (
     AccountIn, AccountOut, ApplicationPatch, AutofillLog, CaptureResult,
-    DigestOut, EmailLinkOut, EmailLinkPatch, FillOut, JobCapture, JobOut,
-    ResolveRequest, ResolveResponse, ScoreOut, Stats, SyncOut, TailorOut,
+    ChatReplyIn, DigestOut, EmailLinkOut, EmailLinkPatch, FillOut, JobCapture,
+    JobOut, ResolveRequest, ResolveResponse, ScoreOut, Stats, SyncOut,
+    TailorOut, TailorPromptOut,
 )
+from tailor import chat as chat_module
 
 engine = make_engine()
 SessionLocal = make_session_factory(engine)
@@ -464,6 +466,69 @@ def tailor_job(
 # ---------------------------------------------------------------------------
 # Inbox
 # ---------------------------------------------------------------------------
+
+@app.get("/jobs/{job_id}/tailor-prompt", response_model=TailorPromptOut)
+def tailor_prompt(job_id: int, session: Session = Depends(get_session)) -> TailorPromptOut:
+    """The prompt to paste into a chat, for this posting.
+
+    Carries the bullets by `fact_id` so the reply can be checked against the
+    fact bank rather than trusted.
+    """
+    from resume.select import select
+
+    job = session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(404, "no such job")
+    if not (job.description_raw or "").strip():
+        raise HTTPException(409, "no description captured for this job")
+
+    profile, jd, result = _score_job(job)
+    selection = select(profile, result.shape)
+    built = chat_module.build_prompt(
+        selection,
+        target_terms=sorted(jd.required | jd.preferred),
+        title=job.title,
+        shape=result.shape.value,
+    )
+    return TailorPromptOut(
+        job_id=job.id, title=job.title, company=job.company.name,
+        shape=built.shape, prompt=built.text, fact_ids=built.fact_ids,
+    )
+
+
+@app.post("/jobs/{job_id}/tailor-from-chat", response_model=TailorOut)
+def tailor_from_chat(
+    job_id: int, body: ChatReplyIn, session: Session = Depends(get_session)
+) -> TailorOut:
+    """Render a resume from bullets read back out of a chat.
+
+    The reply is not trusted: it goes through the same fact-bank gate the API
+    path uses, and a reply that invents an employer, a number or a skill is
+    rejected with the reason rather than rendered.
+    """
+    from tailor.pipeline import record_score, tailor as run_tailor
+
+    job = session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(404, "no such job")
+    if not (job.description_raw or "").strip():
+        raise HTTPException(409, "no description captured for this job")
+
+    profile, jd, result = _score_job(job)
+    record_score(session, job, result)
+
+    job.application.match_score = result.total
+    job.application.shape = result.shape.value
+    outcome = run_tailor(session, profile, job, jd, result, chat_reply=body.reply)
+    if not outcome.tailored:
+        raise HTTPException(422, outcome.note)
+
+    return TailorOut(
+        job_id=job.id, score=_score_out(job, jd, result), tailored=True,
+        resume_path=outcome.resume_path, docx_path=outcome.docx_path,
+        rephrased=outcome.rephrased, note=outcome.note,
+    )
+
 
 @app.post("/inbox/sync", response_model=SyncOut)
 def inbox_sync(session: Session = Depends(get_session)) -> SyncOut:

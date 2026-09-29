@@ -99,9 +99,14 @@ async function saveCard(payload) {
   chrome.runtime.sendMessage({ type: "jobs-changed" }).catch(() => {});
   const jobId = result.job && result.job.id;
 
-  // Enrich in the background: the click has already been answered.
+  // Enrich in the background: the click has already been answered. Tailoring
+  // waits on the description, so it is chained rather than fired alongside.
   if (jobId && payload.apply_url) {
-    enrich(payload).catch(() => {});
+    enrich(payload)
+      .then((enriched) => {
+        if (enriched) return autoTailor(jobId);
+      })
+      .catch(() => {});
   }
 
   return { ok: true, duplicate: result.created === false, result };
@@ -114,17 +119,44 @@ async function enrich(payload) {
   let html;
   try {
     const response = await fetch(payload.apply_url, { credentials: "include" });
-    if (!response.ok) return;
+    if (!response.ok) return false;
     html = await response.text();
   } catch {
-    return; // offline, blocked, or a login wall — the job is still saved
+    return false; // offline, blocked, or a login wall — the job is still saved
   }
 
   const description = descriptionFromHtml(html);
-  if (!description) return;
+  if (!description) return false;
 
   await api("/jobs", postJson({ ...payload, description }));
   chrome.runtime.sendMessage({ type: "jobs-changed" }).catch(() => {});
+  return true;
+}
+
+// Starring a job should leave a resume waiting for you. Only for jobs that
+// clear the score gate, though — tailoring below it is the spend the gate
+// exists to prevent, and a resume for a job you will not apply to is noise.
+async function autoTailor(jobId) {
+  if (!(await getFlag(AUTO_TAILOR, true))) return;
+  let verdict;
+  try {
+    verdict = await api(`/jobs/${jobId}/score`, { method: "POST" });
+  } catch {
+    return;
+  }
+  if (!verdict.passes) return;
+  await tailorInChat(jobId).catch(() => {});
+}
+
+const AUTO_TAILOR = "autoTailorOnSave";
+
+async function getFlag(key, fallback) {
+  try {
+    const stored = await chrome.storage.local.get(key);
+    return stored[key] === undefined ? fallback : Boolean(stored[key]);
+  } catch {
+    return fallback;
+  }
 }
 
 // The service worker has no DOM, so this reads the fetched page as text.
@@ -169,6 +201,97 @@ function stripTags(value) {
     .replace(/&quot;/g, '"')
     .replace(/\s+/g, " ")
     .trim();
+}
+
+// --- tailoring through a chat window ---------------------------------------
+
+// Opens (or reuses) a claude.ai tab, hands it the prompt the server built, and
+// posts the reply back for validation. The reply is never trusted here: the
+// server checks every bullet against the fact bank and rejects anything that
+// does not trace to one, so the worst a broken scrape can do is fail loudly.
+async function tailorInChat(jobId) {
+  let prompt;
+  try {
+    prompt = await api(`/jobs/${jobId}/tailor-prompt`);
+  } catch (error) {
+    return { ok: false, stage: "prompt", error: String(error.message || error) };
+  }
+
+  let tab;
+  try {
+    tab = await claudeTab();
+  } catch (error) {
+    return { ok: false, stage: "tab", error: String(error.message || error) };
+  }
+
+  let answer;
+  try {
+    answer = await chrome.tabs.sendMessage(tab.id, {
+      type: "run-chat-prompt",
+      prompt: prompt.prompt,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      stage: "chat",
+      prompt: prompt.prompt,
+      error: "could not reach the claude.ai tab — reload it and try again",
+    };
+  }
+  if (!answer || !answer.ok) {
+    // The prompt travels back so the panel can offer a manual paste instead.
+    return { ok: false, stage: "chat", prompt: prompt.prompt, error: (answer && answer.error) || "no reply" };
+  }
+
+  try {
+    const result = await api(`/jobs/${jobId}/tailor-from-chat`, postJson({ reply: answer.reply }));
+    chrome.runtime.sendMessage({ type: "jobs-changed" }).catch(() => {});
+    notify("Resume ready", `${prompt.company} — ${prompt.title}`);
+    return { ok: true, result };
+  } catch (error) {
+    // A rejection here is the fact bank refusing invented content. Say so.
+    return {
+      ok: false,
+      stage: "validate",
+      prompt: prompt.prompt,
+      reply: answer.reply,
+      error: String(error.message || error),
+    };
+  }
+}
+
+async function claudeTab() {
+  const existing = await chrome.tabs.query({ url: "https://claude.ai/*" });
+  const tab = existing[0] || (await chrome.tabs.create({ url: "https://claude.ai/new", active: false }));
+  await waitForComplete(tab.id);
+
+  // The content script is declared for claude.ai, but a tab that was already
+  // open before the extension was installed or reloaded has not got it.
+  try {
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content/chat.js"] });
+  } catch {
+    // Already injected, or the tab is mid-navigation; the sendMessage below
+    // is the real test of whether it is reachable.
+  }
+  return tab;
+}
+
+function waitForComplete(tabId, timeout = 30000) {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + timeout;
+    const check = async () => {
+      let tab;
+      try {
+        tab = await chrome.tabs.get(tabId);
+      } catch {
+        return reject(new Error("the claude.ai tab was closed"));
+      }
+      if (tab.status === "complete") return resolve(tab);
+      if (Date.now() > deadline) return reject(new Error("claude.ai did not finish loading"));
+      setTimeout(check, 250);
+    };
+    check();
+  });
 }
 
 // --- filling ---------------------------------------------------------------
@@ -309,6 +432,10 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   }
   if (message.type === "fill") {
     fillActiveTab(message).then(respond);
+    return true;
+  }
+  if (message.type === "tailor-in-chat") {
+    tailorInChat(message.jobId).then(respond);
     return true;
   }
   if (message.type === "save-card") {

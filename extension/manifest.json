@@ -13,7 +13,8 @@
   "host_permissions": [
     "http://127.0.0.1:8765/*",
     "https://*.linkedin.com/*",
-    "https://*.indeed.com/*"
+    "https://*.indeed.com/*",
+    "https://claude.ai/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -44,6 +45,15 @@
       ],
       "js": [
         "content/cards.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://claude.ai/*"
+      ],
+      "js": [
+        "content/chat.js"
       ],
       "run_at": "document_idle"
     }

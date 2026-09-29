@@ -61,8 +61,15 @@ def tailor(
     result: Score,
     *,
     use_model: bool = False,
+    chat_reply: str | None = None,
     out_dir: Path = Path("data/resumes"),
 ) -> TailorOutcome:
+    """Render the resume for this posting.
+
+    `chat_reply` is rewritten bullets read back out of a chat window. It goes
+    through the same fact-bank gate the API path uses — where the text came
+    from does not change what it is allowed to claim.
+    """
     from resume.docx_render import render_docx
     from resume.select import select
     from resume.typst_render import render_pdf
@@ -71,7 +78,17 @@ def tailor(
 
     selection = select(profile, result.shape)
     note, rephrased = "", 0
-    if use_model:
+    rewrote = bool(use_model or chat_reply)
+
+    if chat_reply:
+        from tailor.chat import ChatReplyUnusable, apply_reply
+
+        try:
+            rewritten = apply_reply(profile, selection, chat_reply)
+        except ChatReplyUnusable as error:
+            return TailorOutcome(False, note=f"could not read the chat reply: {error}")
+        selection, note, rephrased = rewritten.selection, rewritten.note, rewritten.changed
+    elif use_model:
         rewritten = rephrase(
             profile, selection,
             target_terms=sorted(jd.required | jd.preferred),
@@ -79,7 +96,7 @@ def tailor(
         )
         selection, note, rephrased = rewritten.selection, rewritten.note, rewritten.changed
 
-    problems = check_selection(profile, selection, strict=not use_model)
+    problems = check_selection(profile, selection, strict=not rewrote)
     if problems:
         return TailorOutcome(False, note=f"traceability failed: {problems[0]}")
 

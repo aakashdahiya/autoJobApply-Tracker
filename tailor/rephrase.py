@@ -131,9 +131,22 @@ def rephrase(
         return RephraseResult(selection, note="model returned nothing usable")
 
     proposed = {item.fact_id: item.bullet.strip() for item in rewrite.bullets}
+    return accept_or_discard(profile, selection, proposed)
+
+
+def accept_or_discard(
+    profile: Profile, selection: Selection, proposed: dict[str, str]
+) -> RephraseResult:
+    """Take rewritten bullets only if they survive the fact bank.
+
+    This is the gate, and it is deliberately the only way rewritten text
+    reaches a resume — whether it came from the API or was read back out of a
+    chat window. Rewriting is the one step where invention is possible, so
+    nothing that fails here is kept, and the original text is used instead.
+    """
     original = {b.fact_id: b.text for b in selection.bullets}
 
-    # Structural checks first: the model must return the same set of bullets.
+    # Structural checks first: the same set of bullets must come back.
     if set(proposed) != set(original):
         added = sorted(set(proposed) - set(original))
         dropped = sorted(set(original) - set(proposed))

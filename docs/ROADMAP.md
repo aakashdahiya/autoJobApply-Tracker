@@ -160,6 +160,29 @@ needs confirming from a machine that can reach it.
 
 ---
 
+## Phase 5.5 — Capture from the results page, tailor in a chat — **done**
+
+Built on top of Phase 3's tailoring rather than replacing it.
+
+- A save star on every LinkedIn and Indeed job card; the description is fetched from the
+  detail page afterwards, and a card that could not be enriched stays marked as needing it.
+- Tailoring through a claude.ai tab: the server builds the prompt, the extension pastes it,
+  reads the reply back, and posts it for validation. No API key needed.
+- The reply goes through the same fact-bank gate the API path uses. A chat that invents an
+  employer, a number or a skill is rejected with the reason, and the resume falls back to your
+  own wording rather than shipping something false.
+- Manual paste is always available, because claude.ai is someone else's page and its markup is
+  not a contract. A failed read-back returns the prompt so the work is never lost.
+- The extension attaches the posting's own tailored resume, named `<Name>_Resume.pdf` so the
+  internal per-company filename never reaches a recruiter.
+
+**Not done, deliberately:** bulk background scraping of LinkedIn and Indeed listings. Neither
+publishes a jobs API, both block scrapers, and it is the account you apply from that pays for
+it. The star covers the same ground for pages you are already looking at, and the nightly ATS
+crawl covers volume.
+
+---
+
 ## Phase 6 — Hardening, once it is in daily use
 
 - Workday adapter hardening: full-flow instead of partial fill, selector re-verification after
