@@ -269,3 +269,75 @@ def test_an_unconfigured_transport_is_reported_as_owed_not_as_nothing(client, mo
     assert body["urgent"], "an assessment should have been flagged urgent"
     assert body["pushed"] == 0
     assert body["push_failed"] == 1, "an owed push reported as zero reads as nothing owed"
+
+
+# --- which resume gets attached ---------------------------------------------
+
+AI_JD_FOR_RESUME = AI_JD
+
+
+def test_the_jobs_own_resume_is_attached_once_it_is_tailored(client):
+    """Attaching the shape-level resume to a posting that has a tailored one is
+    the quiet version of applying with the wrong file."""
+    job_id = post_job(client, description=AI_JD_FOR_RESUME).json()["job"]["id"]
+    tailored = client.post(f"/jobs/{job_id}/tailor").json()
+    assert tailored["tailored"] is True
+
+    application_id = client.get(f"/jobs/{job_id}").json()["application"]["id"]
+    body = client.post("/autofill/resolve", json={
+        "fields": [], "application_id": application_id, "shape": "ai_engineer",
+    }).json()
+
+    assert body["resume_url"] == f"/applications/{application_id}/resume.pdf"
+
+
+def test_an_untailored_application_falls_back_to_the_shape_resume(client):
+    job_id = post_job(client, description=AI_JD_FOR_RESUME).json()["job"]["id"]
+    application_id = client.get(f"/jobs/{job_id}").json()["application"]["id"]
+
+    body = client.post("/autofill/resolve", json={
+        "fields": [], "application_id": application_id, "shape": "ai_engineer",
+    }).json()
+
+    assert body["resume_url"] == "/resume/ai_engineer.pdf"
+
+
+def test_the_tailored_pdf_is_actually_served(client):
+    job_id = post_job(client, description=AI_JD_FOR_RESUME).json()["job"]["id"]
+    client.post(f"/jobs/{job_id}/tailor")
+    application_id = client.get(f"/jobs/{job_id}").json()["application"]["id"]
+
+    response = client.get(f"/applications/{application_id}/resume.pdf")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.content[:4] == b"%PDF"
+
+
+def test_asking_for_a_resume_before_tailoring_says_what_to_do(client):
+    job_id = post_job(client, description=AI_JD_FOR_RESUME).json()["job"]["id"]
+    application_id = client.get(f"/jobs/{job_id}").json()["application"]["id"]
+
+    response = client.get(f"/applications/{application_id}/resume.pdf")
+    assert response.status_code == 409
+    assert "tailor" in response.json()["detail"]
+
+
+def test_a_missing_tailored_file_falls_back_rather_than_failing_the_fill(client):
+    """The file can be deleted out from under the database — a cleared
+    data/resumes, a restored backup. The fill should still attach something."""
+    from api.db import Application
+
+    job_id = post_job(client, description=AI_JD_FOR_RESUME).json()["job"]["id"]
+    client.post(f"/jobs/{job_id}/tailor")
+    application_id = client.get(f"/jobs/{job_id}").json()["application"]["id"]
+
+    session = client.session_factory()
+    application = session.get(Application, application_id)
+    application.resume_path = "data/resumes/deleted-by-hand.pdf"
+    session.commit()
+    session.close()
+
+    body = client.post("/autofill/resolve", json={
+        "fields": [], "application_id": application_id,
+    }).json()
+    assert body["resume_url"] == "/resume/ai_engineer.pdf"

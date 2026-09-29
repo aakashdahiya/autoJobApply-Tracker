@@ -59,6 +59,7 @@ def to_job_out(job: Job) -> JobOut:
         salary_raw=job.salary_raw,
         discovered_at=job.discovered_at,
         is_open=job.is_open,
+        has_description=bool((job.description_raw or "").strip()),
         application=job.application,
     )
 
@@ -175,7 +176,9 @@ def load_profile_cached(path: str | None = None):
 
 
 @app.post("/autofill/resolve", response_model=ResolveResponse)
-def resolve_fields(request: ResolveRequest) -> ResolveResponse:
+def resolve_fields(
+    request: ResolveRequest, session: Session = Depends(get_session)
+) -> ResolveResponse:
     """Say what belongs in each field the extension found.
 
     Nothing here writes to a page — the content script does that, and only
@@ -194,14 +197,74 @@ def resolve_fields(request: ResolveRequest) -> ResolveResponse:
         for f in request.fields
     ]
     fills = autofill.resolve(profile, specs)
-    resume_url = f"/resume/{request.shape}.pdf" if request.shape else None
+    resume_url = _resume_url_for(
+        session, request.job_id, request.application_id, request.shape
+    )
     return ResolveResponse(
         fills=[FillOut(**vars(f)) for f in fills],
         filled=sum(1 for f in fills if f.action in {"fill", "select"}),
         skipped=sum(1 for f in fills if f.action == "skip"),
         unmatched=sum(1 for f in fills if f.action == "unmatched"),
         resume_url=resume_url,
+        resume_filename=(
+            f"{profile.identity.name.replace(' ', '_')}_Resume.pdf" if resume_url else None
+        ),
     )
+
+
+def _resume_url_for(session, job_id: int | None, application_id: int | None,
+                    shape: str | None) -> str | None:
+    """Prefer the resume written for this posting; fall back to the shape's.
+
+    Attaching the generic shape-level resume to a posting that has a tailored
+    one is the quiet version of applying with the wrong file, so the job's own
+    resume wins whenever it exists on disk. The panel knows the application;
+    the job id is accepted too, since a caller holding only that should not
+    have to look it up.
+    """
+    from pathlib import Path
+
+    application = None
+    if application_id is not None:
+        application = session.get(Application, application_id)
+    elif job_id is not None:
+        job = session.get(Job, job_id)
+        application = job.application if job is not None else None
+
+    if application is not None:
+        if application.resume_path and Path(application.resume_path).exists():
+            return f"/applications/{application.id}/resume.pdf"
+        shape = shape or application.shape
+    return f"/resume/{shape}.pdf" if shape else None
+
+
+@app.get("/applications/{application_id}/resume.pdf")
+def application_resume_pdf(application_id: int, session: Session = Depends(get_session)):
+    """The resume tailored for this posting.
+
+    Falls back to the application's shape when it has not been tailored yet, so
+    the panel always has something to attach rather than failing the fill.
+    """
+    from pathlib import Path
+
+    from fastapi.responses import FileResponse
+
+    application = session.get(Application, application_id)
+    if application is None:
+        raise HTTPException(404, "no such application")
+
+    if application.resume_path:
+        path = Path(application.resume_path)
+        if path.exists():
+            return FileResponse(path, media_type="application/pdf", filename=path.name)
+
+    if not application.shape:
+        raise HTTPException(
+            409,
+            "no resume for this application yet — tailor it first "
+            f"(POST /jobs/{application.job_id}/tailor)",
+        )
+    return resume_pdf(application.shape)
 
 
 @app.get("/resume/{shape}.pdf")

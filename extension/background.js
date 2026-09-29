@@ -79,7 +79,110 @@ async function captureActiveTab() {
   }
 }
 
+// --- saving from a results card --------------------------------------------
+
+// A card gives title, company, location and the job's URL, but never the
+// description — that lives on the detail page. So the save happens first (it is
+// what you clicked for), and the description is fetched afterwards on a best
+// effort. Scoring and tailoring both need it, so when the fetch comes back
+// empty the job is left marked as needing its description rather than being
+// presented as ready to apply.
+async function saveCard(payload) {
+  let result;
+  try {
+    result = await api("/jobs", postJson(payload));
+  } catch (error) {
+    notify("Tracker unreachable", "Is the API running on 127.0.0.1:8765?");
+    return { ok: false, error: String(error.message || error) };
+  }
+
+  chrome.runtime.sendMessage({ type: "jobs-changed" }).catch(() => {});
+  const jobId = result.job && result.job.id;
+
+  // Enrich in the background: the click has already been answered.
+  if (jobId && payload.apply_url) {
+    enrich(payload).catch(() => {});
+  }
+
+  return { ok: true, duplicate: result.created === false, result };
+}
+
+// Re-saves the same job with its description attached. `POST /jobs` dedupes on
+// the same key and fills in a description the first save lacked, so this needs
+// no separate endpoint and inherits the capture path's own tests.
+async function enrich(payload) {
+  let html;
+  try {
+    const response = await fetch(payload.apply_url, { credentials: "include" });
+    if (!response.ok) return;
+    html = await response.text();
+  } catch {
+    return; // offline, blocked, or a login wall — the job is still saved
+  }
+
+  const description = descriptionFromHtml(html);
+  if (!description) return;
+
+  await api("/jobs", postJson({ ...payload, description }));
+  chrome.runtime.sendMessage({ type: "jobs-changed" }).catch(() => {});
+}
+
+// The service worker has no DOM, so this reads the fetched page as text.
+// schema.org first, because both sites emit it and it survives redesigns;
+// the container ids are the fallback.
+function descriptionFromHtml(html) {
+  for (const match of html.matchAll(
+    /<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi
+  )) {
+    try {
+      const found = findPosting(JSON.parse(match[1]));
+      if (found && found.description) return stripTags(found.description).slice(0, 20000);
+    } catch {
+      // A malformed block is not a reason to give up on the others.
+    }
+  }
+  const container =
+    /<div[^>]+id="jobDescriptionText"[^>]*>([\s\S]*?)<\/div>/i.exec(html) ||
+    /<div[^>]+class="[^"]*jobs-description__content[^"]*"[^>]*>([\s\S]*?)<\/div>/i.exec(html);
+  return container ? stripTags(container[1]).slice(0, 20000) : "";
+}
+
+function findPosting(data) {
+  const nodes = Array.isArray(data) ? data : data["@graph"] || [data];
+  for (const node of [].concat(nodes)) {
+    const type = node && node["@type"];
+    if (type === "JobPosting" || (Array.isArray(type) && type.includes("JobPosting"))) {
+      return node;
+    }
+  }
+  return null;
+}
+
+function stripTags(value) {
+  return String(value)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // --- filling ---------------------------------------------------------------
+
+// The name the employer's ATS shows next to your upload. The server picks it,
+// and picks the same one for every posting on purpose: the internal filename
+// carries the company and the role shape, which would tell a recruiter you keep
+// a per-company variant.
+function resumeFilename(resolved, shape) {
+  return (
+    (resolved && resolved.resume_filename) || (shape ? `resume-${shape}.pdf` : "resume.pdf")
+  );
+}
+
 
 async function fillActiveTab({ shape, applicationId }) {
   const tab = await activeTab();
@@ -103,7 +206,9 @@ async function fillActiveTab({ shape, applicationId }) {
       fields: scan.fields,
       shape: shape || null,
       ats,
-      job_id: null,
+      // The application decides which resume gets attached: its own tailored
+      // one when it has been tailored, the shape's only as a fallback.
+      application_id: applicationId || null,
     }));
   } catch (error) {
     notify("Tracker unreachable", "Start the API before filling a form.");
@@ -117,7 +222,7 @@ async function fillActiveTab({ shape, applicationId }) {
     attached = await ask(tab.id, {
       type: "attach",
       url: `${await apiBase()}${resolved.resume_url}`,
-      filename: `resume-${shape}.pdf`,
+      filename: resumeFilename(resolved, shape),
     });
   }
 
@@ -206,12 +311,22 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     fillActiveTab(message).then(respond);
     return true;
   }
+  if (message.type === "save-card") {
+    saveCard(message.payload).then(respond);
+    return true;
+  }
   if (message.type === "api-base") {
     apiBase().then(respond);
     return true;
   }
   return false;
 });
+
+// Exposed for the tests, the way the content scripts do it. The description
+// parser reads other people's HTML, so it is tested rather than trusted.
+if (typeof globalThis !== "undefined") {
+  globalThis.__jobTrackerInternals = { descriptionFromHtml, stripTags, resumeFilename };
+}
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});

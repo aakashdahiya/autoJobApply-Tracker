@@ -50,6 +50,10 @@ class JobOut(BaseModel):
     salary_raw: str | None = None
     discovered_at: dt.datetime
     is_open: bool
+    # Derived, never stored: a job saved from a results card has no description
+    # until the detail page is read, and nothing can be scored or tailored
+    # without one. Deriving it means it cannot go stale.
+    has_description: bool = False
     application: ApplicationOut
 
 
@@ -88,6 +92,7 @@ class FieldIn(BaseModel):
 class ResolveRequest(BaseModel):
     fields: list[FieldIn]
     job_id: int | None = None
+    application_id: int | None = None
     ats: str | None = None
     shape: str | None = None
 
@@ -107,6 +112,10 @@ class ResolveResponse(BaseModel):
     skipped: int
     unmatched: int
     resume_url: str | None = None
+    # What the employer sees next to your upload. Deliberately not the internal
+    # filename: `Name_cohere_ai_engineer.pdf` tells a recruiter you keep a
+    # per-company variant, which is true and none of their business.
+    resume_filename: str | None = None
 
 
 class AccountIn(BaseModel):
