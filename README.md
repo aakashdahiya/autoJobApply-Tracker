@@ -5,8 +5,10 @@ roles, tailor a resume to each one, assist-fill the application form, and track 
 outcome — with email triage feeding status back in automatically.
 
 **Setting it up?** Follow [`docs/SETUP.md`](docs/SETUP.md) — one ordered pass, start to finish.
-For why it is built this way, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); for what was
-built when, [`docs/ROADMAP.md`](docs/ROADMAP.md).
+**How does it all work?** [`docs/HOW-IT-WORKS.md`](docs/HOW-IT-WORKS.md) — the whole tool end to
+end. For why it is built this way, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); for what
+was built when, [`docs/ROADMAP.md`](docs/ROADMAP.md). Taking the project over, or handing it to
+a model? [`HANDOVER.md`](HANDOVER.md).
 
 ## The one-line version
 
@@ -73,8 +75,8 @@ not two rows. And if you already applied, re-capturing warns you instead of lett
 apply twice.
 
 ```bash
-.venv/bin/python -m pytest          # 86 backend tests
-npm test --prefix extension         # 12 capture tests against real DOMs
+.venv/bin/python -m pytest          # 253 backend tests
+npm test --prefix extension         # 60 extension tests against real DOMs
 ```
 
 ## Phase 2 is built: assisted apply
@@ -254,6 +256,24 @@ seven.
 0 2 * * * cd /srv/tracker && .venv/bin/python -m discover.crawl --tailor-top 5
 30 7 * * * cd /srv/tracker && .venv/bin/python -m inbox.run --sync --ghost --digest
 ```
+
+## Also built: save from a results card, tailor in a chat
+
+Every job card on a LinkedIn or Indeed search carries a **☆ Save**. One click stores the posting
+with its apply link, without leaving the results page; the description is fetched from the detail
+page afterwards, and a card that could not be enriched is shown as still needing it rather than
+being offered for tailoring it cannot do.
+
+Cards are found by the job **link** — `/jobs/view/` and `jk=` — not by class names, which both
+sites rename without notice. The first version matched class names, found nothing on a real page,
+and passed its tests only because the test markup had been written to match the selectors.
+
+Tailoring can run through a **claude.ai tab** instead of the API, so no key is needed: the server
+builds the prompt, the extension pastes it, reads the reply back out of the page, and posts it
+for validation. The reply is not trusted. It passes the same fact-bank gate the API path uses, so
+a chat that invents an employer, a number or a skill is rejected with the reason and the resume
+falls back to your own wording. Driving someone else's single-page app is fragile by nature, so
+any failure hands the prompt back for a manual paste — the work is never lost.
 
 ## The Google Sheets mirror
 
